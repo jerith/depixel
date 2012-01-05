@@ -1,0 +1,34 @@
+This is an implementation of the "Depixelizing Pixel Art" algorithm:
+
+  http://research.microsoft.com/en-us/um/people/kopf/pixelart/
+
+This code is provided under the MIT license, the full text of which is in the
+LICENSE file. As far as I know, the algorithm is not covered by any patents or
+restrictive copyright.
+
+This is very much a work in progress at present. My primary aim is to build a
+tool to generate outline fonts from low-resolution bitmap fonts, but that isn't
+ready yet. Nor is any kind of vector format output. So far I have the basic
+pixel grid deformation implemented and I can write PNGs of the intermediate
+steps. There is a handy script to depixel PNGs in the `depixel/scripts`
+directory, and there are unit tests covering some of the code.
+
+I like to keep dependencies small and light, but there are some useful bits
+I've pulled in (or will pull in) to make life easier:
+
+ * I use `networkx` to do the graph stuff, because implementing it myself was
+   getting messy. At some point I may write a streamlined graph implementation
+   to include here and drop the dependency, but that's fairly low down my
+   priority list at present.
+
+ * I use `pypng` to do the PNG reading and writing, but that's isolated in the
+   things that need it and the actual depixeling code works fine without it.
+
+ * I'm probably going to need `bdflib` once I start working with fonts. Like
+   the PNG stuff, I'll restrict its use to the places that need it. Since BDF
+   is a fairly simple format and this library doesn't play nice with pip, I may
+   rewrite the bits I need here as well.
+
+ * I'll probably need to generate some kind of vector format output, and I'll
+   likely need a library to do that. I'll figure out what that might be when I
+   get there.
