@@ -1,5 +1,7 @@
 import png
 
+from depixel.io_data import PixelDataWriter
+
 
 class Bitmap(object):
     mode = 'RGB'
@@ -79,13 +81,8 @@ class Bitmap(object):
                         to_fill.append((nx, ny))
 
 
-class PixelDataPngWriter(object):
-    PIXEL_MULTIPLIER = 40
-    GRID_COLOUR = (127, 127, 127)
-    PIXGRID_COLOUR = (255, 127, 0)
-
-    def __init__(self, pixel_data):
-        self.pixel_data = pixel_data
+class PixelDataPngWriter(PixelDataWriter):
+    FILE_EXT = 'png'
 
     def translate_pixel(self, pixel):
         if pixel in [0, 1]:
@@ -93,66 +90,32 @@ class PixelDataPngWriter(object):
             return (255 * pixel) * 3
         return pixel
 
-    def translate_pixels(self, pixels):
-        return [[self.translate_pixel(p) for p in row] for row in pixels]
+    def make_drawing(self, drawing_type, _filename):
+        if drawing_type == 'pixels':
+            return Bitmap(self.pixel_data.size)
+        return Bitmap((self.pixel_data.size_x * self.PIXEL_SCALE + 1,
+                       self.pixel_data.size_y * self.PIXEL_SCALE + 1),
+                      bgcolour=(127, 127, 127))
 
-    def export_pixels_png(self, filename):
-        bitmap = Bitmap(self.pixel_data.size)
-        bitmap.set_data(self.translate_pixels(self.pixel_data.pixels))
-        bitmap.write_png(filename)
+    def save_drawing(self, drawing, filename):
+        drawing.write_png(filename)
 
-    def node_centre(self, node):
-        return (node[0] * self.PIXEL_MULTIPLIER + self.PIXEL_MULTIPLIER / 2,
-                node[1] * self.PIXEL_MULTIPLIER + self.PIXEL_MULTIPLIER / 2)
+    def draw_pixel(self, drawing, pt, colour):
+        drawing.set_pixel(pt[0], pt[1], self.translate_pixel(colour))
 
-    def export_nodes_png(self, filename, pixgrid=True, nodes=True):
-        bitmap = self.make_big_bitmap()
-        if pixgrid:
-            self.draw_pixgrid(bitmap)
-        if nodes:
-            self.draw_nodes(bitmap)
-        bitmap.write_png(filename)
+    def draw_line(self, drawing, pt0, pt1, colour):
+        drawing.draw_line(pt0, pt1, self.translate_pixel(colour))
 
-    def make_big_bitmap(self):
-        return Bitmap((self.pixel_data.size_x * self.PIXEL_MULTIPLIER + 1,
-                       self.pixel_data.size_y * self.PIXEL_MULTIPLIER + 1),
-                      bgcolour=self.GRID_COLOUR)
-
-    def scale_pt(self, pt):
-        return tuple(int(n * self.PIXEL_MULTIPLIER) for n in pt)
-
-    def draw_pixgrid(self, bitmap):
+    def draw_pixgrid(self, drawing):
         pg = self.pixel_data.grid_graph
         for edge in pg.edges_iter():
-            bitmap.draw_line(self.scale_pt(edge[0]), self.scale_pt(edge[1]),
-                             self.PIXGRID_COLOUR)
+            self.draw_line(drawing,
+                           self.scale_pt(edge[0]),
+                           self.scale_pt(edge[1]),
+                           self.GRID_COLOUR)
         for node, attrs in self.pixel_data.pixel_graph.nodes_iter(data=True):
-            bitmap.fill(self.scale_pt((node[0] + 0.5, node[1] + 0.5)),
+            drawing.fill(self.scale_pt((node[0] + 0.5, node[1] + 0.5)),
                         self.translate_pixel(attrs['value']))
-
-    def draw_nodes(self, bitmap):
-        for edge in self.pixel_data.pixel_graph.edges_iter():
-            bitmap.draw_line(self.node_centre(edge[0]),
-                             self.node_centre(edge[1]),
-                             self.edge_colour(edge[0]))
-
-    def edge_colour(self, node):
-        return {
-            0: (0, 127, 0),
-            1: (0, 0, 255),
-            (0, 0, 0): (0, 191, 0),
-            (255, 255, 255): (0, 0, 255),
-            }[self.pixel_data.pixel_graph.node[node]['value']]
-
-
-def export_png(pixel_data, basename):
-    fn = "pixels_%s.png" % (basename,)
-    PixelDataPngWriter(pixel_data).export_pixels_png(fn)
-
-
-def export_nodes_png(pixel_data, basename, pixel_grid=True, node_graph=True):
-    fn = "nodes_%s.png" % (basename,)
-    PixelDataPngWriter(pixel_data).export_nodes_png(fn, pixel_grid, node_graph)
 
 
 def read_png(filename):

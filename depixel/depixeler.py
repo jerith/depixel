@@ -1,4 +1,4 @@
-# -*- test-case-name: depixel.tests.test_depixel -*-
+# -*- test-case-name: depixel.tests.test_depixeler -*-
 
 """
 An implementation of the Depixelizing Pixel Art algorithm.

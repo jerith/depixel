@@ -2,7 +2,7 @@ from unittest import TestCase
 
 import networkx as nx
 
-from depixel.depixel import PixelData
+from depixel.depixeler import PixelData
 
 
 EAR = """
