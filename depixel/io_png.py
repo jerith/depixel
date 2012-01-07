@@ -106,16 +106,14 @@ class PixelDataPngWriter(PixelDataWriter):
     def draw_line(self, drawing, pt0, pt1, colour):
         drawing.draw_line(pt0, pt1, self.translate_pixel(colour))
 
-    def draw_pixgrid(self, drawing):
-        pg = self.pixel_data.grid_graph
-        for edge in pg.edges_iter():
-            self.draw_line(drawing,
-                           self.scale_pt(edge[0]),
-                           self.scale_pt(edge[1]),
-                           self.GRID_COLOUR)
-        for node, attrs in self.pixel_data.pixel_graph.nodes_iter(data=True):
-            drawing.fill(self.scale_pt((node[0] + 0.5, node[1] + 0.5)),
-                        self.translate_pixel(attrs['value']))
+    def draw_polygon(self, drawing, path, colour, fill):
+        pt0 = path[-1]
+        for pt1 in path:
+            self.draw_line(drawing, pt0, pt1, colour)
+            pt0 = pt1
+        middle = (sum([p[0] for p in path]) / len(path),
+                  sum([p[1] for p in path]) / len(path))
+        drawing.fill(middle, fill)
 
 
 def read_png(filename):

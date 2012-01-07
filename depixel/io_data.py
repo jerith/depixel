@@ -42,7 +42,17 @@ class PixelDataWriter(object):
         self.save_drawing(drawing, filename)
 
     def draw_pixgrid(self, drawing):
-        raise NotImplementedError("We don't have a good way to do this yet.")
+        for pixel, attrs in self.pixel_data.pixel_graph.nodes_iter(data=True):
+            nodes = attrs['corners'].copy()
+            path = [nodes.pop()]
+            while nodes:
+                for neighbor in self.pixel_data.grid_graph.neighbors(path[-1]):
+                    if neighbor in nodes:
+                        nodes.remove(neighbor)
+                        path.append(neighbor)
+                        break
+            self.draw_polygon(drawing, [self.scale_pt(p) for p in path],
+                              self.GRID_COLOUR, attrs['value'])
 
     def node_centre(self, node):
         return self.scale_pt(

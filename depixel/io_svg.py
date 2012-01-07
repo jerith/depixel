@@ -23,13 +23,5 @@ class PixelDataSvgWriter(PixelDataWriter):
     def draw_line(self, drawing, pt0, pt1, colour):
         drawing.add(drawing.line(pt0, pt1, stroke=rgb(colour)))
 
-    def draw_pixgrid(self, drawing):
-        pg = self.pixel_data.grid_graph
-        for edge in pg.edges_iter():
-            self.draw_line(drawing,
-                           self.scale_pt(edge[0]),
-                           self.scale_pt(edge[1]),
-                           self.GRID_COLOUR)
-        # for node, attrs in self.pixel_data.pixel_graph.nodes_iter(data=True):
-        #     bitmap.fill(self.scale_pt((node[0] + 0.5, node[1] + 0.5)),
-        #                 self.translate_pixel(attrs['value']))
+    def draw_polygon(self, drawing, path, colour, fill):
+        drawing.add(drawing.polygon(path, stroke=rgb(colour), fill=rgb(fill)))

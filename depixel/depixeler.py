@@ -32,6 +32,11 @@ def distance(p0, p1):
     return sqrt((p1[0] - p0[0]) ** 2 + (p1[1] - p0[1]) ** 2)
 
 
+def remove_from_set(things, thing):
+    things.add(thing)
+    things.remove(thing)
+
+
 class PixelData(object):
     """
     A representation of a pixel image that knows how to depixel it.
@@ -76,7 +81,9 @@ class PixelData(object):
         for x, y in gen_coords(self.size):
             # While the nodes are created by adding edges, adding them
             # again is safe and lets us easily update metadata.
-            self.pixel_graph.add_node((x, y), value=self.pixel(x, y))
+            corners = set([(x, y), (x + 1, y), (x, y + 1), (x + 1, y + 1)])
+            self.pixel_graph.add_node((x, y),
+                                      value=self.pixel(x, y), corners=corners)
             # This gets called on each node, so we don't have to duplicate
             # edges.
             self._add_pixel_edge((x, y), (x + 1, y))
@@ -243,6 +250,13 @@ class PixelData(object):
         for node in removals:
             self.grid_graph.remove_node(node)
 
+        # Update pixel corner sets.
+        for node, attrs in self.pixel_graph.nodes_iter(data=True):
+            corners = attrs['corners']
+            for corner in corners.copy():
+                if corner not in self.grid_graph:
+                    corners.remove(corner)
+
     def deform_pixel(self, node):
         """
         Deform an individual pixel.
@@ -257,16 +271,27 @@ class PixelData(object):
             offset_x = neighbor[0] - node[0]
             offset_y = neighbor[1] - node[1]
             # There's probably a better way to do this.
-            if not self.match(node, (neighbor[0], node[1])):
+            adj_node = (neighbor[0], node[1])
+            if not self.match(node, adj_node):
                 pn = (px_x, px_y - offset_y)
                 mpn = (px_x, px_y - 0.5 * offset_y)
                 npn = (px_x + 0.25 * offset_x, px_y - 0.25 * offset_y)
+                remove_from_set(self.pixel_corners(adj_node), pixnode)
+                self.pixel_corners(adj_node).add(npn)
+                self.pixel_corners(node).add(npn)
                 self._deform(pixnode, pn, mpn, npn)
-            if not self.match(node, (node[0], neighbor[1])):
+            adj_node = (node[0], neighbor[1])
+            if not self.match(node, adj_node):
                 pn = (px_x - offset_x, px_y)
                 mpn = (px_x - 0.5 * offset_x, px_y)
                 npn = (px_x - 0.25 * offset_x, px_y + 0.25 * offset_y)
+                remove_from_set(self.pixel_corners(adj_node), pixnode)
+                self.pixel_corners(adj_node).add(npn)
+                self.pixel_corners(node).add(npn)
                 self._deform(pixnode, pn, mpn, npn)
+
+    def pixel_corners(self, pixel):
+        return self.pixel_graph.node[pixel]['corners']
 
     def _deform(self, pixnode, pn, mpn, npn):
         # Do the node and edge shuffling.
