@@ -9,8 +9,10 @@ from depixel.depixeler import PixelData
 
 def parse_options():
     parser = OptionParser(usage="usage: %prog [options] file [file [...]]")
-    parser.add_option('--no-pixgrid', help="Suppress pixel grid output.",
-                      dest="draw_grid", action="store_false", default=True)
+    parser.add_option('--write-grid', help="Write pixel grid file.",
+                      dest="write_grid", action="store_true", default=False)
+    parser.add_option('--write-shapes', help="Write object shapes file.",
+                      dest="write_shapes", action="store_true", default=False)
     parser.add_option('--no-nodes', help="Suppress pixel node graph output.",
                       dest="draw_nodes", action="store_false", default=True)
     parser.add_option('--write-pixels', help="Write pixel file.",
@@ -35,27 +37,32 @@ def process_file(options, filename):
     data = PixelData(io_data.read_pixels(filename, 'png'))
     base_filename = os.path.splitext(os.path.split(filename)[-1])[0]
     outdir = options.output_dir
+
+    filetypes = []
+    if options.to_png:
+        filetypes.append('PNG')
+    if options.to_svg:
+        filetypes.append('SVG')
+
     if options.write_pixels:
-        if options.to_png:
-            print "    Writing pixels PNG..."
-            writer = io_data.get_writer(data, base_filename, 'png')
+        for ft in filetypes:
+            print "    Writing pixels %s..." % (ft,)
+            writer = io_data.get_writer(data, base_filename, ft.lower())
             writer.export_pixels(outdir)
-        if options.to_svg:
-            print "    Writing pixels SVG..."
-            writer = io_data.get_writer(data, base_filename, 'svg')
-            writer.export_pixels(outdir)
-    if options.draw_grid or options.draw_nodes:
-        print "    Depixeling..."
-        data.depixel()
-        if options.to_png:
-            print "    Writing depixeled PNG..."
-            writer = io_data.get_writer(data, base_filename, 'png')
-            writer.export_grid(outdir, options.draw_grid, options.draw_nodes)
-        if options.to_svg:
-            print "    Writing depixeled SVG..."
-            writer = io_data.get_writer(data, base_filename, 'svg')
-            writer.export_grid(outdir, options.draw_grid, options.draw_nodes)
-    print "    Done."
+
+    data.depixel()
+
+    if options.write_grid:
+        for ft in filetypes:
+            print "    Writing grid %s..." % (ft,)
+            writer = io_data.get_writer(data, base_filename, ft.lower())
+            writer.export_grid(outdir, options.draw_nodes)
+
+    if options.write_shapes:
+        for ft in filetypes:
+            print "    Writing shapes %s..." % (ft,)
+            writer = io_data.get_writer(data, base_filename, ft.lower())
+            writer.export_shapes(outdir, options.draw_nodes)
 
 
 def main():

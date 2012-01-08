@@ -25,3 +25,11 @@ class PixelDataSvgWriter(PixelDataWriter):
 
     def draw_polygon(self, drawing, path, colour, fill):
         drawing.add(drawing.polygon(path, stroke=rgb(colour), fill=rgb(fill)))
+
+    def draw_path_shape(self, drawing, paths, colour, fill):
+        dpath = []
+        for path in paths:
+            dpath.append('M')
+            dpath.extend(path)
+            dpath.append('Z')
+        drawing.add(drawing.path(dpath, stroke=rgb(colour), fill=rgb(fill)))

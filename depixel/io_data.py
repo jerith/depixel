@@ -6,6 +6,14 @@ import os.path
 from itertools import product
 
 
+def gradient(p0, p1):
+    dx = p1[0] - p0[0]
+    dy = p1[1] - p0[1]
+    if dx == 0:
+        return dy * 99999999999999
+    return 1.0 * dy / dx
+
+
 class PixelDataWriter(object):
     PIXEL_SCALE = 40
     GRID_COLOUR = (255, 127, 0)
@@ -32,11 +40,18 @@ class PixelDataWriter(object):
             self.draw_pixel(drawing, pt, self.pixel_data.pixel(*pt))
         self.save_drawing(drawing, filename)
 
-    def export_grid(self, outdir, grid=True, node_graph=True):
+    def export_grid(self, outdir, node_graph=True):
         filename = self.mkfn(outdir, 'grid')
         drawing = self.make_drawing('grid', filename)
-        if grid:
-            self.draw_pixgrid(drawing)
+        self.draw_pixgrid(drawing)
+        if node_graph:
+            self.draw_nodes(drawing)
+        self.save_drawing(drawing, filename)
+
+    def export_shapes(self, outdir, node_graph=True):
+        filename = self.mkfn(outdir, 'shapes')
+        drawing = self.make_drawing('shapes', filename)
+        self.draw_shapes(drawing)
         if node_graph:
             self.draw_nodes(drawing)
         self.save_drawing(drawing, filename)
@@ -54,9 +69,40 @@ class PixelDataWriter(object):
             self.draw_polygon(drawing, [self.scale_pt(p) for p in path],
                               self.GRID_COLOUR, attrs['value'])
 
-    def node_centre(self, node):
-        return self.scale_pt(
-                node[1] * self.PIXEL_SCALE + self.PIXEL_SCALE / 2)
+    # def node_centre(self, node):
+    #     return self.scale_pt(
+    #             node[1] * self.PIXEL_SCALE + self.PIXEL_SCALE / 2)
+
+    def draw_shapes(self, drawing):
+        for shape in self.pixel_data.shapes:
+            self.draw_shape(drawing, shape)
+
+    def draw_shape(self, drawing, shape):
+        paths = [self.mkpath(shape['outside'])]
+        for graph in shape['inside']:
+            paths.append(self.mkpath(graph, True))
+        self.draw_path_shape(drawing, paths, self.GRID_COLOUR, shape['value'])
+
+    def mkpath(self, shape_graph, outside=False):
+        # Find initial nodes.
+        nodes = set(shape_graph.nodes())
+        path = [min(nodes)]
+        neighbors = sorted(shape_graph.neighbors(path[0]),
+                           key=lambda p: gradient(path[0], p))
+        if outside:
+            path.append(neighbors[-1])
+        else:
+            path.append(neighbors[0])
+        nodes.difference_update(path)
+
+        # Walk rest of nodes.
+        while nodes:
+            for neighbor in shape_graph.neighbors(path[-1]):
+                if neighbor in nodes:
+                    nodes.remove(neighbor)
+                    path.append(neighbor)
+                    break
+        return [self.scale_pt(p) for p in path]
 
     def draw_nodes(self, drawing):
         for edge in self.pixel_data.pixel_graph.edges_iter():
@@ -91,6 +137,9 @@ class PixelDataWriter(object):
 
     def draw_line(self, drawing, p0, p1, colour):
         raise NotImplementedError("This Writer cannot draw a line.")
+
+    def draw_path_shape(self, drawing, paths, colour, fill):
+        raise NotImplementedError("This Writer cannot draw a path shape.")
 
 
 def get_writer(data, basename, filetype):

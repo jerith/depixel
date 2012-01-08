@@ -59,6 +59,7 @@ class PixelData(object):
         self.remove_diagonals()
         self.make_grid_graph()
         self.deform_grid()
+        self.make_shape_outlines()
 
     def pixel(self, x, y):
         """
@@ -302,3 +303,41 @@ class PixelData(object):
             self.grid_graph.add_edge(pn, mpn)
         self.grid_graph.add_edge(mpn, npn)
         self.grid_graph.add_edge(npn, pixnode)
+
+    def make_shape_outlines(self):
+        self.shapes = []
+
+        # Remove internal edges from a copy of our pixgrid graph.
+        shapes_graph = nx.Graph(self.grid_graph)
+        for pixel, attrs in self.pixel_graph.nodes_iter(data=True):
+            corners = attrs['corners']
+            for neighbor in self.pixel_graph.neighbors(pixel):
+                edge = corners & self.pixel_graph.node[neighbor]['corners']
+                if len(edge) != 2:
+                    print edge
+                if shapes_graph.has_edge(*edge):
+                    shapes_graph.remove_edge(*edge)
+        for node in nx.isolates(shapes_graph):
+            shapes_graph.remove_node(node)
+
+        # Build graphs of only the grid nodes in each shape.
+        for pcg in nx.connected_component_subgraphs(self.pixel_graph):
+            corners = set()
+            value = None
+            for pixel, attrs in pcg.nodes_iter(data=True):
+                corners.update(attrs['corners'])
+                value = attrs['value']
+            shape = {
+                'value': value,
+                'outside': None,
+                'inside': [],
+                }
+
+            sg = shapes_graph.subgraph(corners)
+            for graph in nx.connected_component_subgraphs(sg):
+                if (min(graph.nodes()) == min(sg.nodes())):
+                    shape['outside'] = graph
+                else:
+                    shape['inside'].append(graph)
+
+            self.shapes.append(shape)
