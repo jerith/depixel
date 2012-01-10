@@ -13,7 +13,8 @@ pixel grid deformation and shape outline extraction implemented and I can write
 representations of the intermediate steps to PNG and SVG. There is a handy
 script to depixel PNGs in the `depixel/scripts` directory, and there are unit
 tests covering some of the code. There's code to build B-spline curves out of
-the shape outlines, but that isn't hooked up to anything useful yet.
+the shape outlines, but it's quite hacky and only hooked up to the SVG output
+to see if it works.
 
 I like to keep dependencies small and light, but there are some useful bits
 I've pulled in (or will pull in) to make life easier:

@@ -66,6 +66,20 @@ class BSpline(object):
                     (1 - a) * ps[r - 1][i - 1][1] + a * ps[r - 1][i][1])
         return ps[-1][k - s]
 
+    def quadratic_bezier_segments(self):
+        """
+        Extract a sequence of quadratic Bezier curves making up this spline.
+
+        NOTE: This assumes our spline is quadratic.
+        """
+        assert self.degree == 2
+        control_points = self.points[1:-1]
+        on_curve_points = [self(u) for u in self.knots[2:-2]]
+        ocp0 = on_curve_points[0]
+        for cp, ocp1 in zip(control_points, on_curve_points[1:]):
+            yield (ocp0, cp, ocp1)
+            ocp0 = ocp1
+
 
 def polyline_to_closed_bspline(path, degree=2):
     """

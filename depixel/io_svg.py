@@ -33,3 +33,20 @@ class PixelDataSvgWriter(PixelDataWriter):
             dpath.extend(path)
             dpath.append('Z')
         drawing.add(drawing.path(dpath, stroke=rgb(colour), fill=rgb(fill)))
+
+    def draw_curve_shape(self, drawing, splines, colour, fill):
+        dpath = []
+        for spline in splines:
+            bcurves = list(spline.quadratic_bezier_segments())
+            dpath.append('M')
+            dpath.append(self.scale_pt(bcurves[0][0]))
+            for bcurve in bcurves:
+                dpath.append('Q')
+                dpath.append(self.scale_pt(bcurve[1]))
+                dpath.append(self.scale_pt(bcurve[2]))
+            # dpath.append('Z')
+        drawing.add(drawing.path(dpath, stroke=rgb(colour), fill=rgb(fill)))
+
+    def draw_shape(self, drawing, shape):
+        self.draw_curve_shape(drawing, shape['splines'],
+                              self.GRID_COLOUR, shape['value'])
