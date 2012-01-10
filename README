@@ -9,10 +9,11 @@ restrictive copyright.
 This is very much a work in progress at present. My primary aim is to build a
 tool to generate outline fonts from low-resolution bitmap fonts, but that isn't
 ready yet. Nor is any kind of vector format output. So far I have the basic
-pixel grid deformation implemented and I can write representations of the
-intermediate steps to PNG and SVG. There is a handy script to depixel PNGs in
-the `depixel/scripts` directory, and there are unit tests covering some of the
-code.
+pixel grid deformation and shape outline extraction implemented and I can write
+representations of the intermediate steps to PNG and SVG. There is a handy
+script to depixel PNGs in the `depixel/scripts` directory, and there are unit
+tests covering some of the code. There's code to build B-spline curves out of
+the shape outlines, but that isn't hooked up to anything useful yet.
 
 I like to keep dependencies small and light, but there are some useful bits
 I've pulled in (or will pull in) to make life easier:

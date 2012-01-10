@@ -11,6 +11,8 @@ from math import sqrt
 
 import networkx as nx
 
+from depixel import bspline
+
 
 def gen_coords(size):
     for y in xrange(size[1]):
@@ -30,6 +32,15 @@ def cn_edge(edge):
 
 def distance(p0, p1):
     return sqrt((p1[0] - p0[0]) ** 2 + (p1[1] - p0[1]) ** 2)
+
+
+def gradient(p0, p1):
+    # Assume the constant below is big enough. Bleh.
+    dx = p1[0] - p0[0]
+    dy = p1[1] - p0[1]
+    if dx == 0:
+        return dy * 99999999999999
+    return 1.0 * dy / dx
 
 
 def remove_from_set(things, thing):
@@ -60,6 +71,7 @@ class PixelData(object):
         self.make_grid_graph()
         self.deform_grid()
         self.make_shape_outlines()
+        self.make_splines()
 
     def pixel(self, x, y):
         """
@@ -341,3 +353,34 @@ class PixelData(object):
                     shape['inside'].append(graph)
 
             self.shapes.append(shape)
+
+    def make_splines(self):
+        for shape in self.shapes:
+            shape['paths'] = [self.make_path(shape['outside'], True)]
+            for graph in shape['inside']:
+                shape['paths'].append(self.make_path(graph))
+            shape['splines'] = [self.make_spline(p) for p in shape['paths']]
+
+    def make_spline(self, path):
+        return bspline.polyline_to_closed_bspline(path)
+
+    def make_path(self, shape_graph, outside=False):
+        # Find initial nodes.
+        nodes = set(shape_graph.nodes())
+        path = [min(nodes)]
+        neighbors = sorted(shape_graph.neighbors(path[0]),
+                           key=lambda p: gradient(path[0], p))
+        if outside:
+            path.append(neighbors[-1])
+        else:
+            path.append(neighbors[0])
+        nodes.difference_update(path)
+
+        # Walk rest of nodes.
+        while nodes:
+            for neighbor in shape_graph.neighbors(path[-1]):
+                if neighbor in nodes:
+                    nodes.remove(neighbor)
+                    path.append(neighbor)
+                    break
+        return path

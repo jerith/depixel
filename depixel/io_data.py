@@ -69,10 +69,6 @@ class PixelDataWriter(object):
             self.draw_polygon(drawing, [self.scale_pt(p) for p in path],
                               self.GRID_COLOUR, attrs['value'])
 
-    # def node_centre(self, node):
-    #     return self.scale_pt(
-    #             node[1] * self.PIXEL_SCALE + self.PIXEL_SCALE / 2)
-
     def draw_shapes(self, drawing):
         for shape in self.pixel_data.shapes:
             self.draw_shape(drawing, shape)
