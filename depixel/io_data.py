@@ -109,9 +109,11 @@ class PixelDataWriter(object):
 
     def edge_colour(self, node):
         return {
-            0: (0, 127, 0),
+            0: (0, 191, 0),
+            0.5: (191, 0, 0),
             1: (0, 0, 255),
             (0, 0, 0): (0, 191, 0),
+            (127, 127, 127): (191, 0, 0),
             (255, 255, 255): (0, 0, 255),
             }[self.pixel_data.pixel_graph.node[node]['value']]
 

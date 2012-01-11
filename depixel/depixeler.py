@@ -201,7 +201,7 @@ class PixelData(object):
         offset_x = 3 - min(edge[0][0], edge[1][0])
         offset_y = 3 - min(edge[0][1], edge[1][1])
 
-        nodes = [edge[0]]
+        nodes = list(edge[:2])
         seen_nodes = set(nodes)
 
         while nodes:

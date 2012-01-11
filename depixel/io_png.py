@@ -43,7 +43,7 @@ class Bitmap(object):
         for row in self.pixels:
             frow = []
             for value in row:
-                frow.extend(list(value))
+                frow.extend(value)
             flat_pixels.append(frow)
         return flat_pixels
 
@@ -126,9 +126,9 @@ class PixelDataPngWriter(PixelDataWriter):
     FILE_EXT = 'png'
 
     def translate_pixel(self, pixel):
-        if pixel in [0, 1]:
-            # Assume we have binary pixel values.
-            return (255 * pixel) * 3
+        if not isinstance(pixel, (list, tuple)):
+            # Assume monochrome values normalised to [0, 1].
+            return (int(255 * pixel),) * 3
         return pixel
 
     def make_drawing(self, drawing_type, _filename):

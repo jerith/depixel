@@ -38,13 +38,33 @@ ISLAND = """
 ..XX
 """
 
+CEE = """
+...............
+......XXXX..XX.
+....XXooooXXoX.
+...XoooXXXoooX.
+..XoooX...XooX.
+..XooX.....XoX.
+.XoooX......XX.
+.XoooX.........
+.XoooX.........
+.XoooX.........
+.XoooX.........
+..XooX......XX.
+..XoooX....XoX.
+...XoooXXXXoX..
+....XXoooooX...
+......XXXXX....
+...............
+"""
+
 
 def mkpixels(txt_data):
     pixels = []
     for line in txt_data.splitlines():
         line = line.strip()
         if line:
-            pixels.append([{'.': 0, 'X': 1}[c] for c in line])
+            pixels.append([{'.': 0, 'o': 0.5, 'X': 1}[c] for c in line])
     return pixels
 
 
