@@ -178,7 +178,6 @@ class TestPixelData(TestCase):
         pd = PixelData(mkpixels(PLUS))
         pd.make_pixel_graph()
         self.assertEqual(-4, pd.weight_sparse(((0, 0), (1, 1))))
-        self.assertEqual(-4, pd.weight_sparse(((1, 1), (2, 2))))
         self.assertEqual(-9, pd.weight_sparse(((1, 2), (2, 1))))
 
     def test_weight_island(self):
