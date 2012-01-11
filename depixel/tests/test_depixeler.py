@@ -58,6 +58,19 @@ CEE = """
 ...............
 """
 
+INVADER = """
+..............
+.....XXXX.....
+..XXXXXXXXXX..
+.XXX..XX..XXX.
+.XXXXXXXXXXXX.
+.XXXXXXXXXXXX.
+....XX..XX....
+...XX.XX.XX...
+.XX........XX.
+..............
+"""
+
 
 def mkpixels(txt_data):
     pixels = []
