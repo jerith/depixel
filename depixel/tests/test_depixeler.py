@@ -62,8 +62,8 @@ INVADER = """
 ..............
 .....XXXX.....
 ..XXXXXXXXXX..
-.XXX..XX..XXX.
 .XXXXXXXXXXXX.
+.XXX..XX..XXX.
 .XXXXXXXXXXXX.
 ....XX..XX....
 ...XX.XX.XX...
@@ -145,18 +145,18 @@ class TestPixelData(TestCase):
                 ((0, 0), (1, 0), {'diagonal': False}),
                 ((0, 1), (0, 0), {'diagonal': False}),
                 ((0, 1), (0, 2), {'diagonal': False}),
-                ((0, 1), (1, 0), {'diagonal': True}),
-                ((0, 1), (1, 2), {'diagonal': True}),
-                ((1, 1), (2, 2), {'diagonal': True}),
+                ((0, 1), (1, 0), {'diagonal': True, 'ambiguous': False}),
+                ((0, 1), (1, 2), {'diagonal': True, 'ambiguous': False}),
+                ((1, 1), (2, 2), {'diagonal': True, 'ambiguous': False}),
                 ((1, 2), (0, 2), {'diagonal': False}),
-                ((1, 2), (2, 1), {'diagonal': True}),
+                ((1, 2), (2, 1), {'diagonal': True, 'ambiguous': False}),
                 ((2, 0), (1, 0), {'diagonal': False}),
-                ((2, 1), (1, 0), {'diagonal': True}),
+                ((2, 1), (1, 0), {'diagonal': True, 'ambiguous': False}),
                 ((2, 1), (2, 0), {'diagonal': False}),
                 ((3, 0), (2, 0), {'diagonal': False}),
-                ((3, 0), (2, 1), {'diagonal': True}),
+                ((3, 0), (2, 1), {'diagonal': True, 'ambiguous': False}),
                 ((3, 0), (3, 1), {'diagonal': False}),
-                ((3, 1), (2, 0), {'diagonal': True}),
+                ((3, 1), (2, 0), {'diagonal': True, 'ambiguous': False}),
                 ((3, 1), (2, 1), {'diagonal': False}),
                 ((3, 2), (2, 2), {'diagonal': False}),
                 ])
@@ -171,33 +171,33 @@ class TestPixelData(TestCase):
     def test_weight_curve(self):
         pd = PixelData(mkpixels(EAR))
         pd.make_pixel_graph()
-        self.assertEqual(1, pd.weight_curve(((0, 0), (1, 1))))
-        self.assertEqual(1, pd.weight_curve(((1, 1), (2, 2))))
-        self.assertEqual(7, pd.weight_curve(((1, 2), (2, 1))))
+        self.assertEqual((1, 1), pd.weight_curve(((0, 0), (1, 1))))
+        self.assertEqual((1, 1), pd.weight_curve(((1, 1), (2, 2))))
+        self.assertEqual((7, 7), pd.weight_curve(((1, 2), (2, 1))))
 
         pd = PixelData(mkpixels(CIRCLE))
         pd.make_pixel_graph()
-        self.assertEqual(1, pd.weight_curve(((0, 0), (1, 1))))
-        self.assertEqual(1, pd.weight_curve(((1, 1), (2, 2))))
-        self.assertEqual(8, pd.weight_curve(((1, 2), (2, 1))))
+        self.assertEqual((1, 1), pd.weight_curve(((0, 0), (1, 1))))
+        self.assertEqual((1, 1), pd.weight_curve(((1, 1), (2, 2))))
+        self.assertEqual((8, 8), pd.weight_curve(((1, 2), (2, 1))))
 
     def test_weight_sparse(self):
         pd = PixelData(mkpixels(EAR))
         pd.make_pixel_graph()
-        self.assertEqual(-18, pd.weight_sparse(((0, 0), (1, 1))))
-        self.assertEqual(-28, pd.weight_sparse(((1, 1), (2, 2))))
-        self.assertEqual(-8, pd.weight_sparse(((1, 2), (2, 1))))
+        self.assertEqual((-18, -18), pd.weight_sparse(((0, 0), (1, 1))))
+        self.assertEqual((-28, -28), pd.weight_sparse(((1, 1), (2, 2))))
+        self.assertEqual((-8, -8), pd.weight_sparse(((1, 2), (2, 1))))
 
         pd = PixelData(mkpixels(PLUS))
         pd.make_pixel_graph()
-        self.assertEqual(-4, pd.weight_sparse(((0, 0), (1, 1))))
-        self.assertEqual(-9, pd.weight_sparse(((1, 2), (2, 1))))
+        self.assertEqual((-4, -4), pd.weight_sparse(((0, 0), (1, 1))))
+        self.assertEqual((-9, -9), pd.weight_sparse(((1, 2), (2, 1))))
 
     def test_weight_island(self):
         pd = PixelData(mkpixels(ISLAND))
         pd.make_pixel_graph()
-        self.assertEqual(5, pd.weight_island(((1, 1), (2, 2))))
-        self.assertEqual(0, pd.weight_island(((1, 2), (2, 1))))
+        self.assertEqual((5, 5), pd.weight_island(((1, 1), (2, 2))))
+        self.assertEqual((0, 0), pd.weight_island(((1, 2), (2, 1))))
 
     def test_remove_diagonals(self):
         tg = nx.Graph()
@@ -231,21 +231,40 @@ class TestPixelData(TestCase):
                 ((0, 0), (1, 0), {'diagonal': False}),
                 ((0, 1), (0, 0), {'diagonal': False}),
                 ((0, 1), (0, 2), {'diagonal': False}),
-                ((0, 1), (1, 0), {'diagonal': True}),
-                ((0, 1), (1, 2), {'diagonal': True}),
-                ((1, 1), (2, 2), {'diagonal': True}),
+                ((0, 1), (1, 0), {'diagonal': True, 'ambiguous': False}),
+                ((0, 1), (1, 2), {'diagonal': True, 'ambiguous': False}),
+                ((1, 1), (2, 2), {'diagonal': True, 'ambiguous': False}),
                 ((1, 2), (0, 2), {'diagonal': False}),
-                # ((1, 2), (2, 1), {'diagonal': True}),
+                # ((1, 2), (2, 1), {'diagonal': True, 'ambiguous': True}),
                 ((2, 0), (1, 0), {'diagonal': False}),
-                ((2, 1), (1, 0), {'diagonal': True}),
+                ((2, 1), (1, 0), {'diagonal': True, 'ambiguous': False}),
                 ((2, 1), (2, 0), {'diagonal': False}),
                 ((3, 0), (2, 0), {'diagonal': False}),
-                # ((3, 0), (2, 1), {'diagonal': True}),
+                # ((3, 0), (2, 1), {'diagonal': True, 'ambiguous': True}),
                 ((3, 0), (3, 1), {'diagonal': False}),
-                # ((3, 1), (2, 0), {'diagonal': True}),
+                # ((3, 1), (2, 0), {'diagonal': True, 'ambiguous': True}),
                 ((3, 1), (2, 1), {'diagonal': False}),
                 ((3, 2), (2, 2), {'diagonal': False}),
                 ])
+        # tg.add_edges_from([
+        #         ((0, 0), (1, 0), {'diagonal': False}),
+        #         ((0, 1), (0, 0), {'diagonal': False}),
+        #         ((0, 1), (0, 2), {'diagonal': False}),
+        #         ((0, 1), (1, 0), {'diagonal': True}),
+        #         ((0, 1), (1, 2), {'diagonal': True}),
+        #         ((1, 1), (2, 2), {'diagonal': True}),
+        #         ((1, 2), (0, 2), {'diagonal': False}),
+        #         # ((1, 2), (2, 1), {'diagonal': True}),
+        #         ((2, 0), (1, 0), {'diagonal': False}),
+        #         ((2, 1), (1, 0), {'diagonal': True}),
+        #         ((2, 1), (2, 0), {'diagonal': False}),
+        #         ((3, 0), (2, 0), {'diagonal': False}),
+        #         # ((3, 0), (2, 1), {'diagonal': True}),
+        #         ((3, 0), (3, 1), {'diagonal': False}),
+        #         # ((3, 1), (2, 0), {'diagonal': True}),
+        #         ((3, 1), (2, 1), {'diagonal': False}),
+        #         ((3, 2), (2, 2), {'diagonal': False}),
+        #         ])
 
         pd = PixelData(mkpixels(ISLAND))
         pd.make_pixel_graph()
