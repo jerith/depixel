@@ -8,13 +8,16 @@ restrictive copyright.
 
 This is very much a work in progress at present. My primary aim is to build a
 tool to generate outline fonts from low-resolution bitmap fonts, but that isn't
-ready yet. Nor is any kind of vector format output. So far I have the basic
-pixel grid deformation and shape outline extraction implemented and I can write
-representations of the intermediate steps to PNG and SVG. There is a handy
-script to depixel PNGs in the `depixel/scripts` directory, and there are unit
-tests covering some of the code. There's code to build B-spline curves out of
-the shape outlines, but it's quite hacky and only hooked up to the SVG output
-to see if it works.
+ready yet.
+
+So far I have the basic pixel grid deformation, shape outline extraction and
+very simple curve smoothing (polygon -> closed quadratic B-spline -> Bezier
+spline) implemented and I can write representations of the intermediate steps
+to PNG and SVG. (The curve smoothing currently only works for closed shapes,
+because I've been testing with simple monochrome images.)
+
+There is a handy script to depixel PNGs in the `depixel/scripts` directory, and
+there are unit tests covering some of the code.
 
 I like to keep dependencies small and light, but there are some useful bits
 I've pulled in (or will pull in) to make life easier:
