@@ -9,6 +9,7 @@ def rgb(rgb):
 
 class PixelDataSvgWriter(PixelDataWriter):
     FILE_EXT = 'svg'
+    PIXEL_BORDER = None
 
     def make_drawing(self, _drawing_type, filename):
         return Drawing(filename)
@@ -17,8 +18,11 @@ class PixelDataSvgWriter(PixelDataWriter):
         drawing.save()
 
     def draw_pixel(self, drawing, pt, colour):
+        pixel_border = self.PIXEL_BORDER
+        if pixel_border is None:
+            pixel_border = colour
         drawing.add(drawing.rect(self.scale_pt(pt), self.scale_pt((1, 1)),
-                                 stroke=rgb(colour), fill=rgb(colour)))
+                                 stroke=rgb(pixel_border), fill=rgb(colour)))
 
     def draw_line(self, drawing, pt0, pt1, colour):
         drawing.add(drawing.line(pt0, pt1, stroke=rgb(colour)))

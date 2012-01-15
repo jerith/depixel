@@ -20,8 +20,8 @@ def gen_coords(size):
             yield (x, y)
 
 
-def within_bounds(coord, size):
-    x, y = coord
+def within_bounds(coord, size, offset=(0, 0)):
+    x, y = map(sum, zip(coord, offset))
     size_x, size_y = size
     return (0 <= x < size_x and 0 <= y < size_y)
 
@@ -48,12 +48,275 @@ def remove_from_set(things, thing):
     things.remove(thing)
 
 
+class DiagonalResolutionHeuristics(object):
+    SPARSE_WINDOW_SIZE = (8, 8)
+
+    def __init__(self, pixel_graph):
+        self.pixel_graph = pixel_graph
+
+    def sparse_window_offset(self, edge):
+        return (
+            self.SPARSE_WINDOW_SIZE[0] / 2 - 1 - min((edge[0][0], edge[1][0])),
+            self.SPARSE_WINDOW_SIZE[1] / 2 - 1 - min((edge[0][1], edge[1][1])))
+
+    def apply(self, blocks):
+        raise NotImplementedError()
+
+
+class FullyConnectedHeuristics(DiagonalResolutionHeuristics):
+    def apply(self, diagonal_pairs):
+        """
+        Iterate over the set of ambiguous diagonals and resolve them.
+        """
+        for edges in diagonal_pairs:
+            self.weight_diagonals(*edges)
+
+        for edges in diagonal_pairs:
+            min_weight = min(e[2]['h_weight'] for e in edges)
+            for edge in edges:
+                if edge[2]['h_weight'] == min_weight:
+                    self.pixel_graph.remove_edge(*edge[:2])
+                else:
+                    edge[2].pop('h_weight')
+
+    def weight_diagonals(self, edge1, edge2):
+        """
+        Apply heuristics to ambiguous diagonals.
+        """
+        for edge in (edge1, edge2):
+            self.weight_diagonal(edge)
+
+    def weight_diagonal(self, edge):
+        """
+        Apply heuristics to an ambiguous diagonal.
+        """
+        weights = [
+            self.weight_curve(edge),
+            self.weight_sparse(edge),
+            self.weight_island(edge),
+            ]
+        edge[2]['h_weight'] = sum(weights)
+
+    def weight_curve(self, edge):
+        """
+        Weight diagonals based on curve length.
+
+        Edges that are part of long single-pixel-wide features are
+        more likely to be important.
+        """
+        seen_edges = set([cn_edge(edge)])
+        nodes = list(edge[:2])
+
+        while nodes:
+            node = nodes.pop()
+            edges = self.pixel_graph.edges(node, data=True)
+            if len(edges) != 2:
+                # This node is not part of a curve
+                continue
+            for edge in edges:
+                edge = cn_edge(edge)
+                if edge not in seen_edges:
+                    seen_edges.add(edge)
+                    nodes.extend(n for n in edge if n != node)
+        return len(seen_edges)
+
+    def weight_sparse(self, edge):
+        """
+        Weight diagonals based on feature sparseness.
+
+        Sparse features are more likely to be seen as "foreground"
+        rather than "background", and are therefore likely to be more
+        important.
+        """
+
+        nodes = list(edge[:2])
+        seen_nodes = set(nodes)
+        offset = self.sparse_window_offset(edge)
+
+        while nodes:
+            node = nodes.pop()
+            for n in self.pixel_graph.neighbors(node):
+                if n in seen_nodes:
+                    continue
+                if within_bounds(n, self.SPARSE_WINDOW_SIZE, offset=offset):
+                    seen_nodes.add(n)
+                    nodes.append(n)
+
+        return -len(seen_nodes)
+
+    def weight_island(self, edge):
+        """
+        Weight diagonals connected to "islands".
+
+        Single pixels connected to nothing except the edge being
+        examined are likely to be more important.
+        """
+        if (len(self.pixel_graph[edge[0]]) == 1
+            or len(self.pixel_graph[edge[1]]) == 1):
+            return 5
+        return 0
+
+
+class IterativeFinalShapeHeuristics(DiagonalResolutionHeuristics):
+    def apply(self, diagonal_pairs):
+        """
+        Iterate over the set of ambiguous diagonals and resolve them.
+        """
+        new_pairs = []
+
+        for edges in diagonal_pairs:
+            for edge in edges:
+                edge[2]['ambiguous'] = True
+
+        for edges in diagonal_pairs:
+            removals = self.weight_diagonals(*edges)
+            if removals is None:
+                # Nothing to remove, so we're still ambiguous.
+                new_pairs.append(edges)
+                continue
+
+            for edge in edges:
+                if edge in removals:
+                    # Remove this edge
+                    self.pixel_graph.remove_edge(edge[0], edge[1])
+                else:
+                    # Clean up other edges
+                    edge[2].pop('h_weight')
+                    edge[2].pop('ambiguous')
+
+        # Reiterate if necessary.
+        if not new_pairs:
+            # Nothing more to do, let's go home.
+            return
+        elif new_pairs == diagonal_pairs:
+            # No more unambiguous pairs.
+            # TODO: Handle this gracefully.
+            raise ValueError("No more unambiguous blocks.")
+        else:
+            # Try again.
+            self.apply(new_pairs)
+
+    def weight_diagonals(self, edge1, edge2):
+        """
+        Apply heuristics to ambiguous diagonals.
+        """
+        for edge in (edge1, edge2):
+            self.weight_diagonal(edge)
+
+        favour1 = edge1[2]['h_weight'][1] - edge2[2]['h_weight'][0]
+        favour2 = edge1[2]['h_weight'][0] - edge2[2]['h_weight'][1]
+
+        if favour1 == 0 and favour2 == 0:
+            # Unambiguous, remove both.
+            return (edge1, edge2)
+        if favour1 >= 0 and favour2 >= 0:
+            # Unambiguous, edge1 wins.
+            return (edge2,)
+        if favour1 <= 0 and favour2 <= 0:
+            # Unambiguous, edge2 wins.
+            return (edge1,)
+        # We have an ambiguous result.
+        return None
+
+    def weight_diagonal(self, edge):
+        """
+        Apply heuristics to an ambiguous diagonal.
+        """
+        weights = [
+            self.weight_curve(edge),
+            self.weight_sparse(edge),
+            self.weight_island(edge),
+            ]
+        edge[2]['h_weight'] = tuple(sum(w) for w in zip(*weights))
+
+    def weight_curve(self, edge):
+        """
+        Weight diagonals based on curve length.
+
+        Edges that are part of long single-pixel-wide features are
+        more likely to be important.
+        """
+        seen_edges = set([cn_edge(edge)])
+        nodes = list(edge[:2])
+
+        values = list(self._weight_curve(nodes, seen_edges))
+        retvals = (min(values), max(values))
+        return retvals
+
+    def _weight_curve(self, nodes, seen_edges):
+        while nodes:
+            node = nodes.pop()
+            edges = self.pixel_graph.edges(node, data=True)
+            if len(edges) != 2:
+                # This node is not part of a curve
+                continue
+            for edge in edges:
+                ambiguous = ('ambiguous' in edge[2])
+                edge = cn_edge(edge)
+                if edge not in seen_edges:
+                    seen_edges.add(edge)
+                    if ambiguous:
+                        for v in self._weight_curve(
+                                nodes[:], seen_edges.copy()):
+                            yield v
+                    nodes.extend(n for n in edge if n != node)
+        yield len(seen_edges)
+
+    def weight_sparse(self, edge):
+        """
+        Weight diagonals based on feature sparseness.
+
+        Sparse features are more likely to be seen as "foreground"
+        rather than "background", and are therefore likely to be more
+        important.
+        """
+        offset = self.sparse_window_offset(edge)
+        nodes = list(edge[:2])
+        seen_nodes = set(nodes)
+
+        values = list(self._weight_sparse(offset, nodes, seen_nodes))
+        retvals = (min(values), max(values))
+        return retvals
+
+    def _weight_sparse(self, offset, nodes, seen_nodes):
+        while nodes:
+            node = nodes.pop()
+            for n in self.pixel_graph.neighbors(node):
+                if n in seen_nodes:
+                    continue
+                if 'ambiguous' in self.pixel_graph[node][n]:
+                    for v in self._weight_sparse(
+                            offset, nodes[:], seen_nodes.copy()):
+                        yield v
+                if within_bounds(n, self.SPARSE_WINDOW_SIZE, offset):
+                    seen_nodes.add(n)
+                    nodes.append(n)
+
+        yield -len(seen_nodes)
+
+    def weight_island(self, edge):
+        """
+        Weight diagonals connected to "islands".
+
+        Single pixels connected to nothing except the edge being
+        examined are likely to be more important.
+        """
+        if (len(self.pixel_graph[edge[0]]) == 1
+            or len(self.pixel_graph[edge[1]]) == 1):
+            return (5, 5)
+        return (0, 0)
+
+
 class PixelData(object):
     """
     A representation of a pixel image that knows how to depixel it.
 
     :param data: A 2d array of pixel values. It is assumed to be rectangular.
     """
+
+    HEURISTICS = FullyConnectedHeuristics
+    # HEURISTICS = IterativeFinalShapeHeuristics
+
     def __init__(self, pixels):
         self.pixels = pixels
         self.size_x = len(pixels[0])
@@ -110,8 +373,6 @@ class PixelData(object):
         """
         if within_bounds(pix1, self.size) and self.match(pix0, pix1):
             attrs = {'diagonal': pix0[0] != pix1[0] and pix0[1] != pix1[1]}
-            if attrs['diagonal']:
-                attrs['ambiguous'] = False
             self.pixel_graph.add_edge(pix0, pix1, **attrs)
 
     def match(self, pix0, pix1):
@@ -130,7 +391,7 @@ class PixelData(object):
         (in which we need to apply heuristics to determine which diagonal to
         remove). See the paper for details.
         """
-        ambiguous_diagonal_blocks = []
+        ambiguous_diagonal_pairs = []
 
         for nodes in self.walk_pixel_blocks(2):
             edges = [e for e in self.pixel_graph.edges(nodes, data=True)
@@ -143,167 +404,17 @@ class PixelData(object):
                     for edge in diagonals:
                         self.pixel_graph.remove_edge(edge[0], edge[1])
                 elif len(edges) == 2:
-                    # We have a checkerboard, so apply heuristics.
-                    ambiguous_diagonal_blocks.append(nodes)
-                    for edge in diagonals:
-                        edge[2]['ambiguous'] = True
+                    # We have an ambiguous pair to resolve.
+                    ambiguous_diagonal_pairs.append(edges)
                 else:
                     # If we get here, we have an invalid graph, possibly due to
                     # a faulty match function.
                     assert False, "Unexpected diagonal layout"
 
-        self.resolve_ambiguous_diagonals(ambiguous_diagonal_blocks)
+        self.apply_diagonal_heuristics(ambiguous_diagonal_pairs)
 
-    def resolve_ambiguous_diagonals(self, blocks):
-        """
-        Iterate over the set of ambiguous diagonals and resolve them.
-        """
-        new_blocks = []
-        for nodes in blocks:
-            edges = [e for e in self.pixel_graph.edges(nodes, data=True)
-                     if e[0] in nodes and e[1] in nodes]
-            removals = self.weight_diagonals(*edges)
-            if removals is None:
-                # Nothing to remove, so we're still ambiguous.
-                new_blocks.append(nodes)
-                continue
-
-            for edge in edges:
-                if edge in removals:
-                    # Remove this edge
-                    self.pixel_graph.remove_edge(edge[0], edge[1])
-                else:
-                    # Clean up other edges
-                    edge[2].pop('h_weight')
-                    edge[2]['ambiguous'] = False
-
-        # Reiterate if necessary.
-        if not new_blocks:
-            # Nothing more to do, let's go home.
-            return
-        elif new_blocks == blocks:
-            # No more unambiguous blocks.
-            raise ValueError("No more unambiguous blocks.")
-        else:
-            # Try again.
-            self.resolve_ambiguous_diagonals(new_blocks)
-
-    def weight_diagonals(self, edge1, edge2):
-        """
-        Apply heuristicts to ambiguous diagonals.
-        """
-        for edge in (edge1, edge2):
-            self.weight_diagonal(edge)
-
-        favour1 = edge1[2]['h_weight'][1] - edge2[2]['h_weight'][0]
-        favour2 = edge1[2]['h_weight'][0] - edge2[2]['h_weight'][1]
-
-        if favour1 == 0 and favour2 == 0:
-            # Unambiguous, remove both.
-            return (edge1, edge2)
-        if favour1 >= 0 and favour2 >= 0:
-            # Unambiguous, edge1 wins.
-            return (edge2,)
-        if favour1 <= 0 and favour2 <= 0:
-            # Unambiguous, edge2 wins.
-            return (edge1,)
-        # We have an ambiguous result.
-        return None
-
-    def weight_diagonal(self, edge):
-        """
-        Apply heuristicts to an ambiguous diagonal.
-        """
-        weights = [
-            self.weight_curve(edge),
-            self.weight_sparse(edge),
-            self.weight_island(edge),
-            ]
-        edge[2]['h_weight'] = tuple(sum(w) for w in zip(*weights))
-
-    def weight_curve(self, edge):
-        """
-        Weight diagonals based on curve length.
-
-        Edges that are part of long single-pixel-wide features are
-        more likely to be important.
-        """
-        seen_edges = set([cn_edge(edge)])
-        nodes = list(edge[:2])
-
-        values = list(self._weight_curve(nodes, seen_edges))
-        retvals = (min(values), max(values))
-        return retvals
-
-    def _weight_curve(self, nodes, seen_edges):
-        while nodes:
-            node = nodes.pop()
-            edges = self.pixel_graph.edges(node, data=True)
-            if len(edges) != 2:
-                # This node is not part of a curve
-                continue
-            for edge in edges:
-                attrs = edge[2]
-                edge = cn_edge(edge)
-                if edge not in seen_edges:
-                    seen_edges.add(edge)
-                    if attrs['diagonal'] and attrs['ambiguous']:
-                        for v in self._weight_curve(
-                                nodes[:], seen_edges.copy()):
-                            yield v
-                    nodes.extend(n for n in edge if n != node)
-        yield len(seen_edges)
-
-    def weight_sparse(self, edge):
-        """
-        Weight diagonals based on feature sparseness.
-
-        Sparse features are more likely to be seen as "foreground"
-        rather than "background", and are therefore likely to be more
-        important.
-        """
-        window_size = (8, 8)
-        offset = (3 - min(edge[0][0], edge[1][0]),
-                  3 - min(edge[0][1], edge[1][1]))
-
-        nodes = list(edge[:2])
-        seen_nodes = set(nodes)
-
-        values = list(self._weight_sparse(
-            offset, window_size, nodes, seen_nodes))
-        retvals = (min(values), max(values))
-        return retvals
-
-    def _weight_sparse(self, offset, window_size, nodes, seen_nodes):
-        offset_x, offset_y = offset
-
-        while nodes:
-            node = nodes.pop()
-            for x, y in self.pixel_graph.neighbors(node):
-                if (x, y) in seen_nodes:
-                    continue
-                attrs = self.pixel_graph[node][(x, y)]
-                if attrs['diagonal'] and attrs['ambiguous']:
-                    for v in self._weight_sparse(
-                            offset, window_size, nodes[:], seen_nodes.copy()):
-                        yield v
-                if within_bounds((x + offset_x, y + offset_y), window_size):
-                    seen_nodes.add((x, y))
-                    nodes.append((x, y))
-
-        yield -len(seen_nodes)
-
-    def weight_island(self, edge):
-        """
-        Weight diagonals connected to "islands".
-
-        Single pixels connected to nothing except the edge being
-        examined are likely to be more important.
-        """
-        if (len(self.pixel_graph[edge[0]]) == 1
-            or len(self.pixel_graph[edge[1]]) == 1):
-            return (5, 5)
-        return (0, 0)
+    def apply_diagonal_heuristics(self, ambiguous_diagonal_pairs):
+        self.HEURISTICS(self.pixel_graph).apply(ambiguous_diagonal_pairs)
 
     def walk_pixel_blocks(self, size):
         """
