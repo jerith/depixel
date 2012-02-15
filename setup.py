@@ -1,5 +1,4 @@
-from setuptools import setup, find_packages, Extension
-import sys, os
+from setuptools import setup, find_packages
 
 version = '1.0'
 
