@@ -79,8 +79,9 @@ class PixelDataWriter(object):
 
     def draw_shapes(self, drawing, element='smooth_splines'):
         for shape in self.pixel_data.shapes:
+            paths = getattr(shape, element)
             self.draw_spline_shape(
-                drawing, shape[element], self.GRID_COLOUR, shape['value'])
+                drawing, paths, self.GRID_COLOUR, shape.value)
 
     def draw_nodes(self, drawing):
         for edge in self.pixel_data.pixel_graph.edges_iter():

@@ -333,8 +333,9 @@ class PixelData(object):
         self.remove_diagonals()
         self.make_grid_graph()
         self.deform_grid()
-        self.make_shape_outlines()
-        self.make_splines()
+        self.make_shapes()
+        self.isolate_outlines()
+        self.add_shape_outlines()
         self.smooth_splines()
 
     def pixel(self, x, y):
@@ -506,50 +507,63 @@ class PixelData(object):
         self.grid_graph.add_edge(mpn, npn)
         self.grid_graph.add_edge(npn, pixnode)
 
-    def make_shape_outlines(self):
-        self.shapes = []
+    def make_shapes(self):
+        self.shapes = set()
 
+        for pcg in nx.connected_component_subgraphs(self.pixel_graph):
+            pixels = set()
+            value = None
+            corners = set()
+            for pixel, attrs in pcg.nodes_iter(data=True):
+                pixels.add(pixel)
+                corners.update(attrs['corners'])
+                value = attrs['value']
+            self.shapes.add(Shape(pixels, value, corners))
+
+    def isolate_outlines(self):
         # Remove internal edges from a copy of our pixgrid graph.
-        shapes_graph = nx.Graph(self.grid_graph)
+        self.outlines_graph = nx.Graph(self.grid_graph)
         for pixel, attrs in self.pixel_graph.nodes_iter(data=True):
             corners = attrs['corners']
             for neighbor in self.pixel_graph.neighbors(pixel):
                 edge = corners & self.pixel_graph.node[neighbor]['corners']
                 if len(edge) != 2:
                     print edge
-                if shapes_graph.has_edge(*edge):
-                    shapes_graph.remove_edge(*edge)
-        for node in nx.isolates(shapes_graph):
-            shapes_graph.remove_node(node)
+                if self.outlines_graph.has_edge(*edge):
+                    self.outlines_graph.remove_edge(*edge)
+        for node in nx.isolates(self.outlines_graph):
+            self.outlines_graph.remove_node(node)
 
-        # Build graphs of only the grid nodes in each shape.
-        for pcg in nx.connected_component_subgraphs(self.pixel_graph):
-            corners = set()
-            value = None
-            for pixel, attrs in pcg.nodes_iter(data=True):
-                corners.update(attrs['corners'])
-                value = attrs['value']
-            shape = {
-                'value': value,
-                'outside': None,
-                'inside': [],
-                }
-
-            sg = shapes_graph.subgraph(corners)
+    def add_shape_outlines(self):
+        for shape in self.shapes:
+            sg = self.outlines_graph.subgraph(shape.corners)
             for graph in nx.connected_component_subgraphs(sg):
                 if (min(graph.nodes()) == min(sg.nodes())):
-                    shape['outside'] = graph
+                    shape.add_outline(graph, True)
                 else:
-                    shape['inside'].append(graph)
+                    shape.add_outline(graph)
 
-            self.shapes.append(shape)
-
-    def make_splines(self):
+    def smooth_splines(self):
         for shape in self.shapes:
-            shape['paths'] = [self.make_path(shape['outside'], True)]
-            for graph in shape['inside']:
-                shape['paths'].append(self.make_path(graph))
-            shape['splines'] = [self.make_spline(p) for p in shape['paths']]
+            shape.smooth_splines = [
+                self.smooth_spline(s.copy()) for s in shape.splines]
+
+    def smooth_spline(self, spline):
+        return bspline.smooth_spline(spline)
+
+
+class Shape(object):
+    def __init__(self, pixels, value, corners):
+        self.pixels = pixels
+        self.value = value
+        self.corners = corners
+        self.paths = []
+        self.splines = []
+
+    def add_outline(self, graph, outside=False):
+        path = self.make_path(graph, outside)
+        self.paths.append(path)
+        self.splines.append(self.make_spline(path))
 
     def make_spline(self, path):
         return bspline.polyline_to_closed_bspline(path)
@@ -574,11 +588,3 @@ class PixelData(object):
                     path.append(neighbor)
                     break
         return path
-
-    def smooth_splines(self):
-        for shape in self.shapes:
-            shape['smooth_splines'] = [
-                self.smooth_spline(s.copy()) for s in shape['splines']]
-
-    def smooth_spline(self, spline):
-        return bspline.smooth_spline(spline)
