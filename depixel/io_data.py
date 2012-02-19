@@ -51,7 +51,15 @@ class PixelDataWriter(object):
     def export_shapes(self, outdir, node_graph=True):
         filename = self.mkfn(outdir, 'shapes')
         drawing = self.make_drawing('shapes', filename)
-        self.draw_shapes(drawing)
+        self.draw_shapes(drawing, 'splines')
+        if node_graph:
+            self.draw_nodes(drawing)
+        self.save_drawing(drawing, filename)
+
+    def export_smooth(self, outdir, node_graph=True):
+        filename = self.mkfn(outdir, 'smooth')
+        drawing = self.make_drawing('smooth', filename)
+        self.draw_shapes(drawing, 'smooth_splines')
         if node_graph:
             self.draw_nodes(drawing)
         self.save_drawing(drawing, filename)
@@ -69,36 +77,10 @@ class PixelDataWriter(object):
             self.draw_polygon(drawing, [self.scale_pt(p) for p in path],
                               self.GRID_COLOUR, attrs['value'])
 
-    def draw_shapes(self, drawing):
+    def draw_shapes(self, drawing, element='smooth_splines'):
         for shape in self.pixel_data.shapes:
-            self.draw_shape(drawing, shape)
-
-    def draw_shape(self, drawing, shape):
-        paths = [self.mkpath(shape['outside'])]
-        for graph in shape['inside']:
-            paths.append(self.mkpath(graph, True))
-        self.draw_path_shape(drawing, paths, self.GRID_COLOUR, shape['value'])
-
-    def mkpath(self, shape_graph, outside=False):
-        # Find initial nodes.
-        nodes = set(shape_graph.nodes())
-        path = [min(nodes)]
-        neighbors = sorted(shape_graph.neighbors(path[0]),
-                           key=lambda p: gradient(path[0], p))
-        if outside:
-            path.append(neighbors[-1])
-        else:
-            path.append(neighbors[0])
-        nodes.difference_update(path)
-
-        # Walk rest of nodes.
-        while nodes:
-            for neighbor in shape_graph.neighbors(path[-1]):
-                if neighbor in nodes:
-                    nodes.remove(neighbor)
-                    path.append(neighbor)
-                    break
-        return [self.scale_pt(p) for p in path]
+            self.draw_spline_shape(
+                drawing, shape[element], self.GRID_COLOUR, shape['value'])
 
     def draw_nodes(self, drawing):
         for edge in self.pixel_data.pixel_graph.edges_iter():
@@ -138,6 +120,9 @@ class PixelDataWriter(object):
 
     def draw_path_shape(self, drawing, paths, colour, fill):
         raise NotImplementedError("This Writer cannot draw a path shape.")
+
+    def draw_spline_shape(self, drawing, paths, colour, fill):
+        raise NotImplementedError("This Writer cannot draw a spline shape.")
 
 
 def get_writer(data, basename, filetype):

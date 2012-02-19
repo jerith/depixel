@@ -13,6 +13,8 @@ def parse_options():
                       dest="write_grid", action="store_true", default=False)
     parser.add_option('--write-shapes', help="Write object shapes file.",
                       dest="write_shapes", action="store_true", default=False)
+    parser.add_option('--write-smooth', help="Write smooth shapes file.",
+                      dest="write_smooth", action="store_true", default=False)
     parser.add_option('--no-nodes', help="Suppress pixel node graph output.",
                       dest="draw_nodes", action="store_false", default=True)
     parser.add_option('--write-pixels', help="Write pixel file.",
@@ -63,6 +65,12 @@ def process_file(options, filename):
             print "    Writing shapes %s..." % (ft,)
             writer = io_data.get_writer(data, base_filename, ft.lower())
             writer.export_shapes(outdir, options.draw_nodes)
+
+    if options.write_smooth:
+        for ft in filetypes:
+            print "    Writing smooth shapes %s..." % (ft,)
+            writer = io_data.get_writer(data, base_filename, ft.lower())
+            writer.export_smooth(outdir, options.draw_nodes)
 
 
 def main():

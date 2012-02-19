@@ -38,7 +38,10 @@ class PixelDataSvgWriter(PixelDataWriter):
             dpath.append('Z')
         drawing.add(drawing.path(dpath, stroke=rgb(colour), fill=rgb(fill)))
 
-    def draw_curve_shape(self, drawing, splines, colour, fill):
+    def draw_spline_shape(self, drawing, splines, colour, fill):
+        if fill == (255, 255, 255):
+            # Don't draw plain white shapes.
+            return
         dpath = []
         for spline in splines:
             bcurves = list(spline.quadratic_bezier_segments())
@@ -48,7 +51,7 @@ class PixelDataSvgWriter(PixelDataWriter):
                 dpath.append('Q')
                 dpath.append(self.scale_pt(bcurve[1]))
                 dpath.append(self.scale_pt(bcurve[2]))
-            # dpath.append('Z')
+            dpath.append('Z')
         drawing.add(drawing.path(dpath, stroke=rgb(colour), fill=rgb(fill)))
 
     def draw_shape(self, drawing, shape):

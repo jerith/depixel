@@ -335,6 +335,7 @@ class PixelData(object):
         self.deform_grid()
         self.make_shape_outlines()
         self.make_splines()
+        self.smooth_splines()
 
     def pixel(self, x, y):
         """
@@ -573,3 +574,11 @@ class PixelData(object):
                     path.append(neighbor)
                     break
         return path
+
+    def smooth_splines(self):
+        for shape in self.shapes:
+            shape['smooth_splines'] = [
+                self.smooth_spline(s.copy()) for s in shape['splines']]
+
+    def smooth_spline(self, spline):
+        return bspline.smooth_spline(spline)

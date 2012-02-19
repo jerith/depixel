@@ -193,6 +193,13 @@ class PixelDataPngWriter(PixelDataWriter):
             x0, y0 = x1, y1
         return inside
 
+    def draw_shapes(self, drawing, element=None):
+        for shape in self.pixel_data.shapes:
+            paths = [[self.scale_pt(p) for p in path]
+                     for path in shape['paths']]
+            self.draw_path_shape(
+                drawing, paths, self.GRID_COLOUR, shape['value'])
+
 
 def read_png(filename):
     _w, _h, pixels, _meta = png.Reader(filename=filename).asRGB8()

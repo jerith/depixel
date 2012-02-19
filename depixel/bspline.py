@@ -12,10 +12,12 @@ More specifically, De Boor's Algorithm is at:
 http://www.cs.mtu.edu/~shene/COURSES/cs3621/NOTES/spline/B-spline/de-Boor.html
 
 Errors are likely due to my lack of understanding rather than any deficiency in
-the source material. I haven't put in the time and effort to completely
-understand the underlying theory, so I may have done something silly. However,
-my tests seem to do the right thing.
+the source material. I don't completely understand the underlying theory, so I
+may have done something silly. However, my tests seem to do the right thing.
 """
+
+import random
+from math import sqrt
 
 
 class BSpline(object):
@@ -29,8 +31,8 @@ class BSpline(object):
       * m = n + p + 1
     """
     def __init__(self, knots, points, degree=None):
-        self.knots = knots
-        self.points = points
+        self.knots = tuple(knots)
+        self._points = list(points)
         expected_degree = len(knots) - len(points) - 1
         if degree is None:
             degree = expected_degree
@@ -38,10 +40,35 @@ class BSpline(object):
             raise ValueError("Expected degree %s, got %s." % (
                 expected_degree, degree))
         self.degree = degree
+        self._reset_cache()
+
+    def _reset_cache(self):
+        self._cache = {}
+
+    def move_point(self, i, value):
+        self._points[i] = value
+        self._reset_cache()
+
+    def __str__(self):
+        return "<%s degree=%s, points=%s, knots=%s>" % (
+            type(self).__name__,
+            self.degree, len(self.points), len(self.knots))
+
+    def copy(self):
+        return type(self)(self.knots, self.points, self.degree)
 
     @property
     def domain(self):
-        return (self.knots[self.degree], self.knots[-1 - self.degree])
+        return (self.knots[self.degree],
+                self.knots[len(self.knots) - self.degree - 1])
+
+    @property
+    def points(self):
+        return tuple(self._points)
+
+    @property
+    def useful_points(self):
+        return self.points
 
     def __call__(self, u):
         """
@@ -53,6 +80,10 @@ class BSpline(object):
                 break
         if s == 0:
             k -= 1
+        if self.degree == 0:
+            if k == len(self.points):
+                k -= 1
+            return self.points[k]
         ps = [dict(zip(range(k - self.degree, k - s + 1),
                        self.points[k - self.degree:k - s + 1]))]
 
@@ -80,6 +111,101 @@ class BSpline(object):
             yield (ocp0, cp, ocp1)
             ocp0 = ocp1
 
+    def derivative(self):
+        """
+        Take the derivative.
+        """
+        cached = self._cache.get('derivative')
+        if cached:
+            return cached
+
+        new_points = []
+        p = self.degree
+        for i in range(0, len(self.points) - 1):
+            coeff = p / (self.knots[i + 1 + p] - self.knots[i + 1])
+            new_points.append((
+                    coeff * (self.points[i + 1][0] - self.points[i][0]),
+                    coeff * (self.points[i + 1][1] - self.points[i][1])))
+
+        cached = BSpline(self.knots[1:-1], new_points, p - 1)
+        self._cache['derivative'] = cached
+        return cached
+
+    def _clamp_domain(self, value):
+        return max(self.domain[0], min(self.domain[1], value))
+
+    def _get_span(self, index):
+        return (self._clamp_domain(self.knots[index]),
+                self._clamp_domain(self.knots[index + 1]))
+
+    def _get_point_spans(self, index):
+        return [self._get_span(index + i) for i in range(self.degree)]
+
+    def integrate_over_span(self, func, span, intervals):
+        if span[0] == span[1]:
+            return 0
+
+        interval = (span[1] - span[0]) / intervals
+        result = (func(span[0]) + func(span[1])) / 2
+        for i in xrange(1, intervals):
+            result += func(span[0] + i * interval)
+        result *= interval
+
+        return result
+
+    def integrate_for(self, index, func, intervals):
+        spans_ = self._get_point_spans(index)
+        spans = [span for span in spans_ if span[0] != span[1]]
+        return sum(self.integrate_over_span(func, span, intervals)
+                   for span in spans)
+
+    def curvature(self, u):
+        drv1 = self.derivative()
+        drv2 = drv1.derivative()
+        d1, d2 = drv1(u), drv2(u)
+        num = abs(d1[0] * d2[1] - d2[0] * d1[1])
+        den = sqrt((d1[0] ** 2 + d1[1] ** 2) ** 3)
+        if den == 0:
+            return 0
+        return num / den
+
+    def curvature_energy(self, index, intervals_per_span):
+        return self.integrate_for(index, self.curvature, intervals_per_span)
+
+
+class ClosedBSpline(BSpline):
+    def __init__(self, knots, points, degree=None):
+        super(ClosedBSpline, self).__init__(knots, points, degree)
+        self._unwrapped_len = len(self._points) - self.degree
+        self._check_wrapped()
+
+    def _check_wrapped(self):
+        if self._points[:self.degree] != self._points[-self.degree:]:
+            raise ValueError(
+                "Points not wrapped at degree %s." % (self.degree,))
+
+    def move_point(self, index, value):
+        if not 0 <= index < len(self._points):
+            raise IndexError(index)
+        index = index % self._unwrapped_len
+        super(ClosedBSpline, self).move_point(index, value)
+        if index < self.degree:
+            super(ClosedBSpline, self).move_point(
+                index + self._unwrapped_len, value)
+
+    @property
+    def useful_points(self):
+        return self.points[:-self.degree]
+
+    def _get_span(self, index):
+        span = lambda i: (self.knots[i], self.knots[i + 1])
+        d0, d1 = span(index)
+        if d0 < self.domain[0]:
+            d0, d1 = span(index + len(self.points) - self.degree)
+        elif d1 > self.domain[1]:
+            d0, d1 = span(index + self.degree - len(self.points))
+        return self._clamp_domain(d0), self._clamp_domain(d1)
+
 
 def polyline_to_closed_bspline(path, degree=2):
     """
@@ -90,4 +216,57 @@ def polyline_to_closed_bspline(path, degree=2):
     m = len(points) + degree
     knots = [float(i) / m for i in xrange(m + 1)]
 
-    return BSpline(knots, points, degree)
+    return ClosedBSpline(knots, points, degree)
+
+
+class SplineSmoother(object):
+    INTERVALS_PER_SPAN = 10
+    POINT_GUESSES = 10
+    GUESS_OFFSET = 0.02
+    ITERATIONS = 10
+
+    # INTERVALS_PER_SPAN = 5
+    # POINT_GUESSES = 1
+    # ITERATIONS = 1
+
+    def __init__(self, spline):
+        self.orig = spline
+        self.spline = spline.copy()
+
+    def _e_curvature(self, index):
+        return self.spline.curvature_energy(index, self.INTERVALS_PER_SPAN)
+
+    def _e_positional(self, index):
+        orig = self.orig.points[index]
+        point = self.spline.points[index]
+        e_positional = sum((p[0] - p[1]) ** 2 for p in zip(point, orig)) ** 2
+        return e_positional
+
+    def point_energy(self, index):
+        e_curvature = self._e_curvature(index)
+        e_positional = self._e_positional(index)
+        return e_positional + e_curvature
+
+    def _rand(self):
+        return (random.random() - 0.5) * self.GUESS_OFFSET
+
+    def smooth_point(self, index, start):
+        energies = [(self.point_energy(index), start)]
+        for _ in range(self.POINT_GUESSES):
+            point = tuple(i + self._rand() for i in start)
+            self.spline.move_point(index, point)
+            energies.append((self.point_energy(index), point))
+        self.spline.move_point(index, min(energies)[1])
+
+    def smooth(self):
+        print "."
+        for _it in range(self.ITERATIONS):
+            # print "IT:", _it
+            for i, point in enumerate(self.spline.useful_points):
+                self.smooth_point(i, point)
+
+
+def smooth_spline(spline):
+    smoother = SplineSmoother(spline)
+    smoother.smooth()
+    return smoother.spline

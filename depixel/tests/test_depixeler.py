@@ -7,6 +7,12 @@ from depixel.depixeler import (
     FullyConnectedHeuristics, IterativeFinalShapeHeuristics)
 
 
+BAR = """
+XXXX
+X..X
+XXXX
+"""
+
 EAR = """
 ......
 ..XX..
@@ -98,8 +104,8 @@ def mkpixels(txt_data):
     for line in txt_data.splitlines():
         line = line.strip()
         if line:
-            # pixels.append([{'.': 0, 'o': 0.5, 'X': 1}[c] for c in line])
-            pixels.append([{'.': 0, 'o': 0, 'X': 1}[c] for c in line])
+            pixels.append([{'.': 1, 'o': 0.5, 'X': 0}[c] for c in line])
+            # pixels.append([{'.': 0, 'o': 0, 'X': 1}[c] for c in line])
     return pixels
 
 
@@ -110,13 +116,13 @@ def sort_edges(edges):
 class TestUtils(TestCase):
     def test_mkpixels(self):
         ear_pixels = [
-            [0, 0, 0, 0, 0, 0],
-            [0, 0, 1, 1, 0, 0],
-            [0, 1, 0, 0, 1, 0],
-            [0, 1, 0, 0, 1, 0],
-            [0, 0, 0, 0, 1, 0],
-            [0, 0, 0, 0, 1, 0],
-            [0, 0, 0, 0, 0, 0],
+            [1, 1, 1, 1, 1, 1],
+            [1, 1, 0, 0, 1, 1],
+            [1, 0, 1, 1, 0, 1],
+            [1, 0, 1, 1, 0, 1],
+            [1, 1, 1, 1, 0, 1],
+            [1, 1, 1, 1, 0, 1],
+            [1, 1, 1, 1, 1, 1],
             ]
         self.assertEqual(ear_pixels, mkpixels(EAR))
 
@@ -214,29 +220,29 @@ class TestPixelData(TestCase):
     def test_pixel_graph(self):
         tg = nx.Graph()
         tg.add_nodes_from([
-                ((0, 0), {'value': 0,
+                ((0, 0), {'value': 1,
                           'corners': set([(0, 0), (0, 1), (1, 0), (1, 1)])}),
-                ((0, 1), {'value': 0,
+                ((0, 1), {'value': 1,
                           'corners': set([(0, 1), (0, 2), (1, 1), (1, 2)])}),
-                ((0, 2), {'value': 0,
+                ((0, 2), {'value': 1,
                           'corners': set([(0, 2), (0, 3), (1, 2), (1, 3)])}),
-                ((1, 0), {'value': 0,
+                ((1, 0), {'value': 1,
                           'corners': set([(1, 0), (1, 1), (2, 0), (2, 1)])}),
-                ((1, 1), {'value': 1,
+                ((1, 1), {'value': 0,
                           'corners': set([(1, 1), (1, 2), (2, 1), (2, 2)])}),
-                ((1, 2), {'value': 0,
+                ((1, 2), {'value': 1,
                           'corners': set([(1, 2), (1, 3), (2, 2), (2, 3)])}),
-                ((2, 0), {'value': 0,
+                ((2, 0), {'value': 1,
                           'corners': set([(2, 0), (2, 1), (3, 0), (3, 1)])}),
-                ((2, 1), {'value': 0,
+                ((2, 1), {'value': 1,
                           'corners': set([(2, 1), (2, 2), (3, 1), (3, 2)])}),
-                ((2, 2), {'value': 1,
+                ((2, 2), {'value': 0,
                           'corners': set([(2, 2), (2, 3), (3, 2), (3, 3)])}),
-                ((3, 0), {'value': 0,
+                ((3, 0), {'value': 1,
                           'corners': set([(3, 0), (3, 1), (4, 0), (4, 1)])}),
-                ((3, 1), {'value': 0,
+                ((3, 1), {'value': 1,
                           'corners': set([(3, 1), (3, 2), (4, 1), (4, 2)])}),
-                ((3, 2), {'value': 1,
+                ((3, 2), {'value': 0,
                           'corners': set([(3, 2), (3, 3), (4, 2), (4, 3)])}),
                 ])
         tg.add_edges_from([
@@ -269,29 +275,29 @@ class TestPixelData(TestCase):
     def test_remove_diagonals(self):
         tg = nx.Graph()
         tg.add_nodes_from([
-                ((0, 0), {'value': 0,
+                ((0, 0), {'value': 1,
                           'corners': set([(0, 0), (0, 1), (1, 0), (1, 1)])}),
-                ((0, 1), {'value': 0,
+                ((0, 1), {'value': 1,
                           'corners': set([(0, 1), (0, 2), (1, 1), (1, 2)])}),
-                ((0, 2), {'value': 0,
+                ((0, 2), {'value': 1,
                           'corners': set([(0, 2), (0, 3), (1, 2), (1, 3)])}),
-                ((1, 0), {'value': 0,
+                ((1, 0), {'value': 1,
                           'corners': set([(1, 0), (1, 1), (2, 0), (2, 1)])}),
-                ((1, 1), {'value': 1,
+                ((1, 1), {'value': 0,
                           'corners': set([(1, 1), (1, 2), (2, 1), (2, 2)])}),
-                ((1, 2), {'value': 0,
+                ((1, 2), {'value': 1,
                           'corners': set([(1, 2), (1, 3), (2, 2), (2, 3)])}),
-                ((2, 0), {'value': 0,
+                ((2, 0), {'value': 1,
                           'corners': set([(2, 0), (2, 1), (3, 0), (3, 1)])}),
-                ((2, 1), {'value': 0,
+                ((2, 1), {'value': 1,
                           'corners': set([(2, 1), (2, 2), (3, 1), (3, 2)])}),
-                ((2, 2), {'value': 1,
+                ((2, 2), {'value': 0,
                           'corners': set([(2, 2), (2, 3), (3, 2), (3, 3)])}),
-                ((3, 0), {'value': 0,
+                ((3, 0), {'value': 1,
                           'corners': set([(3, 0), (3, 1), (4, 0), (4, 1)])}),
-                ((3, 1), {'value': 0,
+                ((3, 1), {'value': 1,
                           'corners': set([(3, 1), (3, 2), (4, 1), (4, 2)])}),
-                ((3, 2), {'value': 1,
+                ((3, 2), {'value': 0,
                           'corners': set([(3, 2), (3, 3), (4, 2), (4, 3)])}),
                 ])
         tg.add_edges_from([
