@@ -557,27 +557,45 @@ class Shape(object):
         self.pixels = pixels
         self.value = value
         self.corners = corners
-        self.paths = []
-        self.splines = []
+        self._outside_path = None
+        self._inside_paths = []
+
+    def _paths_attr(self, attr):
+        paths = [list(reversed(getattr(self._outside_path, attr)))]
+        paths.extend(getattr(path, attr) for path in self._inside_paths)
+
+    @property
+    def paths(self):
+        paths = [list(reversed(self._outside_path.path))]
+        paths.extend(path.path for path in self._inside_paths)
+        return paths
+
+    @property
+    def splines(self):
+        paths = [self._outside_path.spline.reversed()]
+        paths.extend(path.spline for path in self._inside_paths)
+        return paths
 
     def add_outline(self, graph, outside=False):
-        path = self.make_path(graph, outside)
-        self.paths.append(path)
-        self.splines.append(self.make_spline(path))
+        path = Path(graph)
+        if outside:
+            self._outside_path = path
+        else:
+            self._inside_paths.append(path)
 
-    def make_spline(self, path):
-        return bspline.polyline_to_closed_bspline(path)
 
-    def make_path(self, shape_graph, outside=False):
+class Path(object):
+    def __init__(self, shape_graph):
+        self.path = self._make_path(shape_graph)
+        self.spline = self.make_spline(self.path)
+
+    def _make_path(self, shape_graph):
         # Find initial nodes.
         nodes = set(shape_graph.nodes())
         path = [min(nodes)]
         neighbors = sorted(shape_graph.neighbors(path[0]),
                            key=lambda p: gradient(path[0], p))
-        if outside:
-            path.append(neighbors[-1])
-        else:
-            path.append(neighbors[0])
+        path.append(neighbors[0])
         nodes.difference_update(path)
 
         # Walk rest of nodes.
@@ -588,3 +606,6 @@ class Shape(object):
                     path.append(neighbor)
                     break
         return path
+
+    def make_spline(self, path):
+        return bspline.polyline_to_closed_bspline(path)

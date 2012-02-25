@@ -33,7 +33,7 @@ class BSpline(object):
     def __init__(self, knots, points, degree=None):
         self.knots = tuple(knots)
         self._points = list(points)
-        expected_degree = len(knots) - len(points) - 1
+        expected_degree = len(self.knots) - len(self._points) - 1
         if degree is None:
             degree = expected_degree
         if degree != expected_degree:
@@ -171,6 +171,11 @@ class BSpline(object):
 
     def curvature_energy(self, index, intervals_per_span):
         return self.integrate_for(index, self.curvature, intervals_per_span)
+
+    def reversed(self):
+        return type(self)(
+            (1 - k for k in reversed(self.knots)), reversed(self._points),
+            self.degree)
 
 
 class ClosedBSpline(BSpline):
