@@ -534,22 +534,35 @@ class PixelData(object):
         for node in nx.isolates(self.outlines_graph):
             self.outlines_graph.remove_node(node)
 
+    def make_path(self, graph):
+        path = Path(graph)
+        key = path.key()
+        if key not in self.paths:
+            self.paths[key] = path
+            path.make_spline()
+        return self.paths[key]
+
     def add_shape_outlines(self):
+        self.paths = {}
+
         for shape in self.shapes:
             sg = self.outlines_graph.subgraph(shape.corners)
             for graph in nx.connected_component_subgraphs(sg):
+                path = self.make_path(graph)
                 if (min(graph.nodes()) == min(sg.nodes())):
-                    shape.add_outline(graph, True)
+                    shape.add_outline(path, True)
                 else:
-                    shape.add_outline(graph)
+                    shape.add_outline(path)
 
     def smooth_splines(self):
-        for shape in self.shapes:
-            shape.smooth_splines = [
-                self.smooth_spline(s.copy()) for s in shape.splines]
-
-    def smooth_spline(self, spline):
-        return bspline.smooth_spline(spline)
+        print "Smoothing splines..."
+        for i, path in enumerate(self.paths.values()):
+            print " * %s/%s (%s, %s)..." % (
+                i + 1, len(self.paths), len(path.shapes), len(path.path))
+            if len(path.shapes) == 1:
+                path.smooth = path.spline.copy()
+                continue
+            path.smooth_spline()
 
 
 class Shape(object):
@@ -576,18 +589,27 @@ class Shape(object):
         paths.extend(path.spline for path in self._inside_paths)
         return paths
 
-    def add_outline(self, graph, outside=False):
-        path = Path(graph)
+    @property
+    def smooth_splines(self):
+        paths = [self._outside_path.smooth.reversed()]
+        paths.extend(path.smooth for path in self._inside_paths)
+        return paths
+
+    def add_outline(self, path, outside=False):
         if outside:
             self._outside_path = path
         else:
             self._inside_paths.append(path)
+        path.shapes.add(self)
 
 
 class Path(object):
     def __init__(self, shape_graph):
         self.path = self._make_path(shape_graph)
-        self.spline = self.make_spline(self.path)
+        self.shapes = set()
+
+    def key(self):
+        return tuple(self.path)
 
     def _make_path(self, shape_graph):
         # Find initial nodes.
@@ -607,5 +629,8 @@ class Path(object):
                     break
         return path
 
-    def make_spline(self, path):
-        return bspline.polyline_to_closed_bspline(path)
+    def make_spline(self):
+        self.spline = bspline.polyline_to_closed_bspline(self.path)
+
+    def smooth_spline(self):
+        self.smooth = bspline.smooth_spline(self.spline)
