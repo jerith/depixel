@@ -17,7 +17,84 @@ may have done something silly. However, my tests seem to do the right thing.
 """
 
 import random
-from math import sqrt
+from math import sqrt, sin, cos, pi
+
+
+class Point(object):
+    """More convenient than using tuples everywhere.
+
+    This implementation uses complex numbers under the hood, but that shouldn't
+    really matter anywhere else.
+    """
+    def __init__(self, value):
+        if isinstance(value, complex):
+            self.value = value
+        elif isinstance(value, (tuple, list)):
+            self.value = value[0] + value[1] * 1j
+        elif isinstance(value, Point):
+            self.value = value.value
+        else:
+            raise ValueError("Invalid value for Point: %r" % (value,))
+
+    def __str__(self):
+        return "<Point (%s, %s)>" % (self.x, self.y)
+
+    def __repr__(self):
+        return str(self)
+
+    @property
+    def x(self):
+        return self.value.real
+
+    @property
+    def y(self):
+        return self.value.imag
+
+    @property
+    def tuple(self):
+        return (self.x, self.y)
+
+    def _op(self, op, other):
+        if isinstance(other, Point):
+            other = other.value
+        return Point(getattr(self.value, op)(other))
+
+    def __eq__(self, other):
+        try:
+            other = Point(other).value
+        except ValueError:
+            pass
+        return self.value.__eq__(other)
+
+    def __add__(self, other):
+        return self._op('__add__', other)
+
+    def __radd__(self, other):
+        return self._op('__radd__', other)
+
+    def __sub__(self, other):
+        return self._op('__sub__', other)
+
+    def __rsub__(self, other):
+        return self._op('__rsub__', other)
+
+    def __mul__(self, other):
+        return self._op('__mul__', other)
+
+    def __rmul__(self, other):
+        return self._op('__rmul__', other)
+
+    def __div__(self, other):
+        return self._op('__div__', other)
+
+    def __rdiv__(self, other):
+        return self._op('__rdiv__', other)
+
+    def __abs__(self):
+        return abs(self.value)
+
+    def round(self, places=5):
+        return Point((round(self.x, places), round(self.y, places)))
 
 
 class BSpline(object):
@@ -32,7 +109,7 @@ class BSpline(object):
     """
     def __init__(self, knots, points, degree=None):
         self.knots = tuple(knots)
-        self._points = list(points)
+        self._points = [Point(p) for p in points]
         expected_degree = len(self.knots) - len(self._points) - 1
         if degree is None:
             degree = expected_degree
@@ -92,9 +169,7 @@ class BSpline(object):
             for i in range(k - self.degree + r, k - s + 1):
                 a = (u - self.knots[i]) / (self.knots[i + self.degree - r + 1]
                                            - self.knots[i])
-                ps[r][i] = (
-                    (1 - a) * ps[r - 1][i - 1][0] + a * ps[r - 1][i][0],
-                    (1 - a) * ps[r - 1][i - 1][1] + a * ps[r - 1][i][1])
+                ps[r][i] = (1 - a) * ps[r - 1][i - 1] + a * ps[r - 1][i]
         return ps[-1][k - s]
 
     def quadratic_bezier_segments(self):
@@ -108,7 +183,7 @@ class BSpline(object):
         on_curve_points = [self(u) for u in self.knots[2:-2]]
         ocp0 = on_curve_points[0]
         for cp, ocp1 in zip(control_points, on_curve_points[1:]):
-            yield (ocp0, cp, ocp1)
+            yield (ocp0.tuple, cp.tuple, ocp1.tuple)
             ocp0 = ocp1
 
     def derivative(self):
@@ -123,9 +198,7 @@ class BSpline(object):
         p = self.degree
         for i in range(0, len(self.points) - 1):
             coeff = p / (self.knots[i + 1 + p] - self.knots[i + 1])
-            new_points.append((
-                    coeff * (self.points[i + 1][0] - self.points[i][0]),
-                    coeff * (self.points[i + 1][1] - self.points[i][1])))
+            new_points.append(coeff * (self.points[i + 1] - self.points[i]))
 
         cached = BSpline(self.knots[1:-1], new_points, p - 1)
         self._cache['derivative'] = cached
@@ -160,14 +233,13 @@ class BSpline(object):
                    for span in spans)
 
     def curvature(self, u):
-        drv1 = self.derivative()
-        drv2 = drv1.derivative()
-        d1, d2 = drv1(u), drv2(u)
-        num = abs(d1[0] * d2[1] - d2[0] * d1[1])
-        den = sqrt((d1[0] ** 2 + d1[1] ** 2) ** 3)
+        d1 = self.derivative()(u)
+        d2 = self.derivative().derivative()(u)
+        num = d1.x * d2.y - d1.y * d2.x
+        den = sqrt(d1.x ** 2 + d1.y ** 2) ** 3
         if den == 0:
             return 0
-        return num / den
+        return abs(num / den)
 
     def curvature_energy(self, index, intervals_per_span):
         return self.integrate_for(index, self.curvature, intervals_per_span)
@@ -224,11 +296,16 @@ def polyline_to_closed_bspline(path, degree=2):
     return ClosedBSpline(knots, points, degree)
 
 
+def magnitude(point):
+    return sqrt(point[0] ** 2 + point[2] ** 2)
+
+
 class SplineSmoother(object):
-    INTERVALS_PER_SPAN = 10
-    POINT_GUESSES = 10
-    GUESS_OFFSET = 0.02
-    ITERATIONS = 10
+    INTERVALS_PER_SPAN = 20
+    POINT_GUESSES = 20
+    GUESS_OFFSET = 0.05
+    ITERATIONS = 20
+    POSITIONAL_ENERGY_MULTIPLIER = 1
 
     # INTERVALS_PER_SPAN = 5
     # POINT_GUESSES = 1
@@ -244,8 +321,8 @@ class SplineSmoother(object):
     def _e_positional(self, index):
         orig = self.orig.points[index]
         point = self.spline.points[index]
-        e_positional = sum((p[0] - p[1]) ** 2 for p in zip(point, orig)) ** 2
-        return e_positional
+        e_positional = abs(point - orig) ** 4
+        return e_positional * self.POSITIONAL_ENERGY_MULTIPLIER
 
     def point_energy(self, index):
         e_curvature = self._e_curvature(index)
@@ -253,18 +330,19 @@ class SplineSmoother(object):
         return e_positional + e_curvature
 
     def _rand(self):
-        return (random.random() - 0.5) * self.GUESS_OFFSET
+        offset = random.random() * self.GUESS_OFFSET
+        angle = random.random() * 2 * pi
+        return offset * Point((cos(angle), sin(angle)))
 
     def smooth_point(self, index, start):
         energies = [(self.point_energy(index), start)]
         for _ in range(self.POINT_GUESSES):
-            point = tuple(i + self._rand() for i in start)
+            point = start + self._rand()
             self.spline.move_point(index, point)
             energies.append((self.point_energy(index), point))
         self.spline.move_point(index, min(energies)[1])
 
     def smooth(self):
-        print "."
         for _it in range(self.ITERATIONS):
             # print "IT:", _it
             for i, point in enumerate(self.spline.useful_points):

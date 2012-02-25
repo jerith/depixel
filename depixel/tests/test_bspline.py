@@ -1,6 +1,6 @@
 from unittest import TestCase
 
-from depixel.bspline import BSpline
+from depixel.bspline import Point, BSpline
 
 
 def make_oct_spline(p=2, offset_x=0, offset_y=0, scale=50):
@@ -10,10 +10,6 @@ def make_oct_spline(p=2, offset_x=0, offset_y=0, scale=50):
     m = len(points) + p
     knots = [float(i) / m for i in range(m + 1)]
     return BSpline(knots, points, p)
-
-
-def tround(tpl, digits=5):
-    return tuple(round(f, digits) for f in tpl)
 
 
 class TestBSpline(TestCase):
@@ -35,4 +31,15 @@ class TestBSpline(TestCase):
 
     def test_spline_point_at_knot(self):
         spline = make_oct_spline()
-        self.assertEqual((150, 300), tround(spline(0.5)))
+        self.assertEqual(Point((150, 300)), spline(0.5).round())
+
+    def test_spline_derivative(self):
+        spline = make_oct_spline()
+        deriv = spline.derivative()
+        self.assertEqual(deriv.degree, spline.degree - 1)
+        self.assertEqual(deriv.knots, spline.knots[1:-1])
+        self.assertEqual(len(deriv.points), len(spline.points) - 1)
+
+    def test_curvature(self):
+        spline = make_oct_spline()
+        self.assertEqual(0.005, round(spline.curvature(0.5), 5))
