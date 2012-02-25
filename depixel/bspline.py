@@ -119,19 +119,12 @@ class BSpline(object):
         self.degree = degree
         self._reset_cache()
 
-    def _reset_cache(self, i=None):
-        ps = {}
-        if i is not None:
-            ps = self._cache['ps']
-            for ps_u in ps.values():
-                for j in range(len(ps_u)):
-                    [ps_u[j].pop(i - k, None) for k in range(j)]
-
-        self._cache = {'ps': ps}
+    def _reset_cache(self):
+        self._cache = {}
 
     def move_point(self, i, value):
         self._points[i] = value
-        self._reset_cache(i)
+        self._reset_cache()
 
     def __str__(self):
         return "<%s degree=%s, points=%s, knots=%s>" % (
@@ -154,23 +147,6 @@ class BSpline(object):
     def useful_points(self):
         return self.points
 
-    def _get_p(self, u, k, s):
-        ps = self._cache['ps'].setdefault(
-            u, [{} for _ in range(self.degree - s + 1)])
-
-        for i in range(k - self.degree, k - s + 1):
-            ps[0][i] = self.points[i]
-
-        def get_p(r, i):
-            if i not in ps[r]:
-                a = (u - self.knots[i]) / (self.knots[i + self.degree - r + 1]
-                                           - self.knots[i])
-                ps[r][i] = (1 - a) * get_p(r - 1, i - 1) + a * get_p(r - 1, i)
-
-            return ps[r][i]
-
-        return get_p(self.degree - 1, k - s)
-
     def __call__(self, u):
         """
         De Boor's Algorithm. Made out of more maths.
@@ -185,8 +161,16 @@ class BSpline(object):
             if k == len(self.points):
                 k -= 1
             return self.points[k]
+        ps = [dict(zip(range(k - self.degree, k - s + 1),
+                       self.points[k - self.degree:k - s + 1]))]
 
-        return self._get_p(u, k, s)
+        for r in range(1, self.degree - s + 1):
+            ps.append({})
+            for i in range(k - self.degree + r, k - s + 1):
+                a = (u - self.knots[i]) / (self.knots[i + self.degree - r + 1]
+                                           - self.knots[i])
+                ps[r][i] = (1 - a) * ps[r - 1][i - 1] + a * ps[r - 1][i]
+        return ps[-1][k - s]
 
     def quadratic_bezier_segments(self):
         """
