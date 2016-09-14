@@ -22,12 +22,12 @@ def parse_options():
 
 def export_image(options, name):
     name = name.upper()
-    print "Processing %s..." % (name,)
+    print("Processing %s..." % (name,))
     data = PixelData(test_depixeler.mkpixels(getattr(test_depixeler, name)))
     base_filename = name.lower()
     outdir = options.output_dir
 
-    print "    Writing pixels PNG..."
+    print("    Writing pixels PNG...")
     writer = io_data.get_writer(data, base_filename, 'png')
     writer.export_pixels(outdir)
 

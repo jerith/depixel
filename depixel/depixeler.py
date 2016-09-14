@@ -15,8 +15,8 @@ from depixel import bspline
 
 
 def gen_coords(size):
-    for y in xrange(size[1]):
-        for x in xrange(size[0]):
+    for y in range(size[1]):
+        for x in range(size[0]):
             yield (x, y)
 
 
@@ -528,7 +528,7 @@ class PixelData(object):
             for neighbor in self.pixel_graph.neighbors(pixel):
                 edge = corners & self.pixel_graph.node[neighbor]['corners']
                 if len(edge) != 2:
-                    print edge
+                    print(edge)
                 if self.outlines_graph.has_edge(*edge):
                     self.outlines_graph.remove_edge(*edge)
         for node in nx.isolates(self.outlines_graph):
@@ -555,10 +555,10 @@ class PixelData(object):
                     shape.add_outline(path)
 
     def smooth_splines(self):
-        print "Smoothing splines..."
+        print("Smoothing splines...")
         for i, path in enumerate(self.paths.values()):
-            print " * %s/%s (%s, %s)..." % (
-                i + 1, len(self.paths), len(path.shapes), len(path.path))
+            print(" * %s/%s (%s, %s)..." % (
+                i + 1, len(self.paths), len(path.shapes), len(path.path)))
             if len(path.shapes) == 1:
                 path.smooth = path.spline.copy()
                 continue

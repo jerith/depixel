@@ -220,7 +220,7 @@ class BSpline(object):
 
         interval = (span[1] - span[0]) / intervals
         result = (func(span[0]) + func(span[1])) / 2
-        for i in xrange(1, intervals):
+        for i in range(1, intervals):
             result += func(span[0] + i * interval)
         result *= interval
 
@@ -291,7 +291,7 @@ def polyline_to_closed_bspline(path, degree=2):
 
     points = path + path[:degree]
     m = len(points) + degree
-    knots = [float(i) / m for i in xrange(m + 1)]
+    knots = [float(i) / m for i in range(m + 1)]
 
     return ClosedBSpline(knots, points, degree)
 
@@ -344,7 +344,7 @@ class SplineSmoother(object):
 
     def smooth(self):
         for _it in range(self.ITERATIONS):
-            # print "IT:", _it
+            # print("IT:", _it)
             for i, point in enumerate(self.spline.useful_points):
                 self.smooth_point(i, point)
 
