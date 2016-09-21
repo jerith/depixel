@@ -35,7 +35,7 @@ def parse_options():
 
 
 def process_file(options, filename):
-    print "Processing %s..." % (filename,)
+    print("Processing %s..." % (filename,))
     data = PixelData(io_data.read_pixels(filename, 'png'))
     base_filename = os.path.splitext(os.path.split(filename)[-1])[0]
     outdir = options.output_dir
@@ -48,7 +48,7 @@ def process_file(options, filename):
 
     if options.write_pixels:
         for ft in filetypes:
-            print "    Writing pixels %s..." % (ft,)
+            print("    Writing pixels %s..." % (ft,))
             writer = io_data.get_writer(data, base_filename, ft.lower())
             writer.export_pixels(outdir)
 
@@ -56,19 +56,19 @@ def process_file(options, filename):
 
     if options.write_grid:
         for ft in filetypes:
-            print "    Writing grid %s..." % (ft,)
+            print("    Writing grid %s..." % (ft,))
             writer = io_data.get_writer(data, base_filename, ft.lower())
             writer.export_grid(outdir, options.draw_nodes)
 
     if options.write_shapes:
         for ft in filetypes:
-            print "    Writing shapes %s..." % (ft,)
+            print("    Writing shapes %s..." % (ft,))
             writer = io_data.get_writer(data, base_filename, ft.lower())
             writer.export_shapes(outdir, options.draw_nodes)
 
     if options.write_smooth:
         for ft in filetypes:
-            print "    Writing smooth shapes %s..." % (ft,)
+            print("    Writing smooth shapes %s..." % (ft,))
             writer = io_data.get_writer(data, base_filename, ft.lower())
             writer.export_smooth(outdir, options.draw_nodes)
 

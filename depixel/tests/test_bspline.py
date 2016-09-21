@@ -21,7 +21,7 @@ class TestBSpline(TestCase):
         try:
             BSpline(knots, points, 3)
             self.fail("Expected ValueError.")
-        except ValueError, e:
+        except ValueError as e:
             self.assertEqual("Expected degree 2, got 3.", e.args[0])
 
     def test_spline_domain(self):
